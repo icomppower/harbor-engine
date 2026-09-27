@@ -5,3 +5,4 @@
 | 2026-09-26 | E4 | PASS | new-title → install, build, G1 green on placeholder island; 3/3 negatives (broken template map, missing entry, missing terrain) |
 | 2026-09-26 | E1 | PASS | 71 required map fields + 5 game fields each rejected by name; schema files in sync; 0 title terms in 240 engine files; 5/5 negatives |
 | 2026-09-26 | E2 | PASS | bay-crossing + placeholder × low/mobile/high × ferry/fly at default limits: 0 failures; forced over-limit shader stops boot with the clear message, setPipeline(null) × 0; 7/7 negatives |
+| 2026-09-26 | E3 | PASS | Pixel 7 emulation, full Chromium new-headless WebGPU: plain drag, drag after a lost touchend, drags on/beside HUD panels all turn 0.198 rad; fixes: capture-phase touch listeners (UI._isolate ate touchstart on panels), release lost/reused touch ids; 2/2 negatives |

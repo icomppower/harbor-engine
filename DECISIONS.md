@@ -21,3 +21,8 @@ SPEC §3 decisions (D1–D7) are in `SPEC.md` / Notion. New ones, one line each:
 - **D15** During development the title links the engine (`file:../harbor-engine`); `v1.0.0` is tagged only
   after E0–E4 are green, then the title switches to `github:icomppower/harbor-engine#v1.0.0` and E0 runs again on
   the installed release.
+- **D16** E3 (mobile look) root causes: the interface stops `touchstart` on its panels (`UI._isolate`), so a look
+  finger landing on a HUD panel's glass never reached TouchControls; and a lost `touchend` (or Android's reused
+  touch identifiers) left `lookId` set, so every later look was ignored. TouchControls now listens in the capture
+  phase and releases any tracked finger missing from `e.touches` or restarting with the same identifier. E3 runs
+  Playwright's full Chromium in new-headless mode (the headless shell loses its WebGPU instance mid-boot).

@@ -60,6 +60,9 @@ async function measure( browser, url ) {
 	const { devices } = await import( 'playwright' );
 	const ctx = await browser.newContext( { ...devices[ 'Pixel 7' ] } );
 	const page = await ctx.newPage();
+	// registered before any page script: when armed, the next touchend never reaches the page (a lost touchend —
+	// a system gesture, an alert, a handler that swallowed it)
+	await page.addInitScript( () => window.addEventListener( 'touchend', ( e ) => { if ( window.__dropTouchEnd ) { window.__dropTouchEnd = false; e.stopImmediatePropagation(); } }, { capture: true } ) );
 	const errors = [];
 	page.on( 'pageerror', ( e ) => errors.push( e.message ) );
 	await page.goto( url + '?touch&noAudio&tier=mobile' );
@@ -94,7 +97,9 @@ async function measure( browser, url ) {
 	await touch( 'touchStart', [ [ 2, W / 2, H * 0.3 ] ] );
 	await touch( 'touchMove', [ [ 2, W / 2 + 20, H * 0.3 ] ] );
 	await wait( 100 );
-	// no touchEnd for finger 2: the next event's touch list simply no longer holds it
+	await page.evaluate( () => { window.__dropTouchEnd = true; } );
+	await touch( 'touchEnd', [] ); // lifted, but the page never hears of it
+	await wait( 100 );
 	out.afterLost = await turn( 3, [ W / 2 - 40, H * 0.55 ] );
 	await touch( 'touchEnd', [] ); await wait( 150 );
 
@@ -111,10 +116,10 @@ async function measure( browser, url ) {
 			if ( r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight ) continue;
 			// on: a point of the panel whose hit target is the panel itself (or its text), not a control
 			let on = null;
-			for ( let fy = 0.2; fy < 0.9 && ! on; fy += 0.2 ) for ( let fx = 0.2; fx < 0.9 && ! on; fx += 0.2 ) {
+			for ( let y = r.top + 2; y < r.bottom - 1 && ! on; y += 3 ) for ( let x = r.left + 2; x < r.right - 1 && ! on; x += 3 ) {
 
-				const x = r.left + r.width * fx, y = r.top + r.height * fy, hit = document.elementFromPoint( x, y );
-				if ( hit && ( hit === el || el.contains( hit ) ) && ! hit.closest( CONTROLS ) ) on = [ x, y ];
+				const hit = document.elementFromPoint( x, y );
+				if ( hit && ( hit === el || el.contains( hit ) ) && ! hit.closest( CONTROLS ) && x > 0 && y > 0 && x < innerWidth && y < innerHeight ) on = [ x, y ];
 
 			}
 
@@ -192,7 +197,7 @@ async function runOn( browser, engine, tag ) {
 
 ensureTitle();
 const { chromium } = await import( 'playwright' );
-const browser = await chromium.launch( { headless: true, args: [ '--enable-unsafe-webgpu', '--ignore-gpu-blocklist' ] } );
+const browser = await chromium.launch( { headless: true, channel: 'chromium', args: [ '--enable-unsafe-webgpu', '--ignore-gpu-blocklist' ] } );
 let code = 0;
 try {
 
@@ -206,7 +211,7 @@ try {
 
 		const MUTATIONS = [
 			[ 'lost touchend never released', 'lost-touchend:', ( s ) => s.replace( 'this.forgetLost( e );\n\t\t\tif ( this.lookId !== null ) return;', 'if ( this.lookId !== null ) return;' ).replace( "( e ) => { this.forgetLost( e ); this.move( e ); }", '( e ) => this.move( e )' ) ],
-			[ 'look only from the view canvas', 'hud-panel:', ( s ) => s.replace( "window.addEventListener( 'touchstart', ( e ) => {\n\n\t\t\tthis.forgetLost( e );", "view.addEventListener( 'touchstart', ( e ) => {\n\n\t\t\tthis.forgetLost( e );" ) ],
+			[ 'look only from the view canvas', 'hud-panel:', ( s ) => s.replace( "window.addEventListener( 'touchstart', ( e ) => {\n\n\t\t\tthis.forgetLost( e );", "view.addEventListener( 'touchstart', ( e ) => {\n\n\t\t\tthis.forgetLost( e );" ).replace( "}, { passive: false, capture: true } );\n\t\twindow.addEventListener( 'touchmove'", "}, opts );\n\t\twindow.addEventListener( 'touchmove'" ) ],
 		];
 		let missed = 0;
 		for ( const [ name, tag, edit ] of MUTATIONS ) {

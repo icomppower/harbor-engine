@@ -73,7 +73,8 @@ export class TouchControls {
 		}
 
 		// look: any finger that does not land on a control — on the view, or on the glass of a HUD panel next to it
-		// (a panel's background is not a control, and a finger starting beside one must still turn the camera)
+		// (a panel's background is not a control, and a finger starting beside one must still turn the camera).
+		// Capture phase: the interface stops touchstart on its panels (UI._isolate) before it could bubble here.
 		const view = app.engine.domElement;
 		view.style.touchAction = 'none';
 		window.addEventListener( 'touchstart', ( e ) => {
@@ -86,19 +87,22 @@ export class TouchControls {
 			this.lookId = t.identifier;
 			this.last = { x: t.clientX, y: t.clientY };
 
-		}, opts );
-		window.addEventListener( 'touchmove', ( e ) => { this.forgetLost( e ); this.move( e ); }, opts );
+		}, { passive: false, capture: true } );
+		window.addEventListener( 'touchmove', ( e ) => { this.forgetLost( e ); this.move( e ); }, { passive: false, capture: true } );
 		const end = ( e ) => this.end( e );
-		window.addEventListener( 'touchend', end );
-		window.addEventListener( 'touchcancel', end );
+		window.addEventListener( 'touchend', end, { capture: true } );
+		window.addEventListener( 'touchcancel', end, { capture: true } );
 
 	}
 
 	// A touchend can be lost (a system gesture, a notification, the finger leaving the page): a tracked finger
 	// that is no longer on the screen is released, or it would hold the look / stick / a button forever.
+	// Identifiers are reused (Chrome on Android numbers fingers from 0), so a touchstart for an identifier still
+	// being tracked means that finger's touchend was lost too.
 	forgetLost( e ) {
 
 		const live = new Set( [ ...e.touches ].map( ( t ) => t.identifier ) );
+		if ( e.type === 'touchstart' ) for ( const t of e.changedTouches ) live.delete( t.identifier );
 		const lost = [];
 		if ( this.lookId !== null && ! live.has( this.lookId ) ) lost.push( this.lookId );
 		if ( this.stickId !== null && ! live.has( this.stickId ) ) lost.push( this.stickId );
