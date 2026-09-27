@@ -12,7 +12,7 @@ cd "${HARBOR_TITLE:-$PWD}"
 [ -f gates/gates.json ] || { echo "verify: no gates/gates.json in $PWD"; exit 2; }
 REQUIRED=($(node -e 'console.log(require("./gates/gates.json").required.join(" "))'))
 ADVISORY=($(node -e 'console.log((require("./gates/gates.json").advisory||[]).join(" "))'))
-if [ $# -gt 0 ]; then SELECTED=("$@"); else SELECTED=("${REQUIRED[@]}" "${ADVISORY[@]}"); fi
+if [ $# -gt 0 ]; then SELECTED=("$@"); else SELECTED=("${REQUIRED[@]}" ${ADVISORY[@]+"${ADVISORY[@]}"}); fi
 
 mkdir -p .verify
 fail=0
@@ -20,7 +20,7 @@ summary=""
 for id in "${SELECTED[@]}"; do
   script="gates/$id.mjs"
   advisory=0
-  for a in "${ADVISORY[@]}"; do [ "$a" = "$id" ] && advisory=1; done
+  for a in ${ADVISORY[@]+"${ADVISORY[@]}"}; do [ "$a" = "$id" ] && advisory=1; done
 
   if [ ! -f "$script" ]; then
     status="FAIL (not implemented)"

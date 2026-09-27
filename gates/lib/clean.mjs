@@ -154,16 +154,6 @@ const SABOTAGE = {
 	sun: ( app ) => { const f = app.updateSun.bind( app ); app.updateSun = () => { const t = app.settings.timeOfDay; app.settings.timeOfDay = 13; f(); app.settings.timeOfDay = t; }; },
 };
 
-// one App per process: each render check runs in a fresh child
-function renderChild( sabotage = '' ) {
-
-	const r = spawnSync( process.execPath, [ fileURLToPath( import.meta.url ), '--render', ...( sabotage ? [ '--sabotage=' + sabotage ] : [] ) ], { encoding: 'utf8', maxBuffer: 1 << 26 } );
-	const line = ( r.stdout || '' ).split( '\n' ).find( ( l ) => l.startsWith( 'RENDER ' ) );
-	for ( const l of ( r.stdout || '' ).split( '\n' ) ) if ( l.startsWith( 'render:' ) ) console.log( l );
-	return line ? JSON.parse( line.slice( 7 ) ) : [ `render: child crashed (exit ${ r.status }): ${ ( r.stderr || '' ).trim().split( '\n' ).slice( - 3 ).join( ' ' ) }` ];
-
-}
-
 // one App per process: each render check runs in a fresh child (this module, --render)
 export function renderChild( sabotage = '' ) {
 
