@@ -1,5 +1,6 @@
 // Scripted fetch → cache → checksum (shared by every title). A title's pipelines/data/fetch.mjs lists its
-// SOURCES ({ file, key, title, licence, licenceUrl, url, body? }) and calls fetchSources( SOURCES ): each file
+// SOURCES ({ file, key, title, licence, licenceUrl, url, body?, fetch? }; `fetch( { download } )` → Buffer for a
+// source that needs several requests, e.g. a paged ArcGIS query) and calls fetchSources( SOURCES ): each file
 // lands in the title's data/raw/ once (never re-downloaded unless --force), with sources.json (licence + URL +
 // fetch time) and MANIFEST.sha256. Pipelines then read only the cache (tools/data/cache.mjs).
 import { createHash } from 'node:crypto';
@@ -17,7 +18,8 @@ export async function download(s, userAgent = 'harbor-engine-data-fetch/1.0') {
     if (res.ok) {
       const buf = Buffer.from(await res.arrayBuffer());
       const ct = res.headers.get('content-type') || '';
-      if (s.file.endsWith('.tif') && !ct.includes('tiff')) throw new Error(`${s.file}: got ${ct}: ${buf.subarray(0, 200)}`);
+      const tiffMagic = buf.length > 8 && (buf.readUInt32LE(0) === 0x002a4949 || buf.readUInt32BE(0) === 0x4d4d002a);
+      if (s.file.endsWith('.tif') && (!ct.includes('tiff') || !tiffMagic)) throw new Error(`${s.file}: not a TIFF (${ct}): ${buf.subarray(0, 200)}`);
       if (s.file.endsWith('.json') && /"error"\s*:/.test(buf.subarray(0, 300).toString())) throw new Error(`${s.file}: service error ${buf.subarray(0, 300)}`);
       return buf;
     }
@@ -34,7 +36,7 @@ export async function fetchSources(SOURCES, { raw = RAW, force = process.argv.in
     const path = join(raw, s.file);
     if (existsSync(path) && !force) { console.log(`cached  ${s.file}`); continue; }
     const t = Date.now();
-    const buf = await download(s, userAgent);
+    const buf = s.fetch ? await s.fetch({ download: (u, o) => download({ ...s, url: u, body: o?.body }, userAgent) }) : await download(s, userAgent);
     writeFileSync(path, buf);
     sources[s.file] = { key: s.key, title: s.title, licence: s.licence, licenceUrl: s.licenceUrl, url: s.url,
       fetched: new Date().toISOString(), bytes: buf.length };

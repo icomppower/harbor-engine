@@ -1,4 +1,4 @@
-// WGS84 <-> UTM (Transverse Mercator, Krüger series to n^4; sub-millimetre inside a zone).
+// WGS84 <-> UTM (northern hemisphere; Transverse Mercator, Krüger series to n^4; sub-millimetre inside a zone).
 const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996;
 const n = f / (2 - f), n2 = n * n, n3 = n2 * n, n4 = n3 * n;
 const A = a / (1 + n) * (1 + n2 / 4 + n4 / 64);
@@ -7,10 +7,16 @@ const beta = [n / 2 - 2 * n2 / 3 + 37 * n3 / 96 - n4 / 360, n2 / 48 + n3 / 15 - 
 const delta = [2 * n - 2 * n2 / 3 - 2 * n3 + 116 * n4 / 45, 7 * n2 / 3 - 8 * n3 / 5 - 227 * n4 / 45, 56 * n3 / 15 - 136 * n4 / 35, 4279 * n4 / 630];
 const E0 = 500000, rad = Math.PI / 180;
 
-export const ZONE = 10;
-const lon0 = (ZONE * 6 - 183) * rad;
+// The zone is the title's (map.json `frame.utmZone`, northern hemisphere), read on first use; setUTMZone()
+// overrides it (tools without a title).
+import { loadMap } from '../lib/title.mjs';
+let zone = null, lon0 = 0;
+export function setUTMZone(z) { zone = z; lon0 = (z * 6 - 183) * rad; }
+const ensure = () => { if (zone === null) setUTMZone(loadMap().frame.utmZone); };
+export const utmZone = () => (ensure(), zone);
 
 export function toUTM(lat, lon) {
+  ensure();
   const phi = lat * rad, lam = lon * rad - lon0;
   const e = Math.sqrt(f * (2 - f));
   const t = Math.sinh(Math.atanh(Math.sin(phi)) - e * Math.atanh(e * Math.sin(phi)));
@@ -24,6 +30,7 @@ export function toUTM(lat, lon) {
 }
 
 export function fromUTM(E, N) {
+  ensure();
   const xi = N / (k0 * A), eta = (E - E0) / (k0 * A);
   let xi1 = xi, eta1 = eta;
   for (let j = 1; j <= 4; j++) {

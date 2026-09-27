@@ -26,3 +26,7 @@ SPEC §3 decisions (D1–D7) are in `SPEC.md` / Notion. New ones, one line each:
   touch identifiers) left `lookId` set, so every later look was ignored. TouchControls now listens in the capture
   phase and releases any tracked finger missing from `e.touches` or restarting with the same identifier. E3 runs
   Playwright's full Chromium in new-headless mode (the headless shell loses its WebGPU instance mid-boot).
+- **D17** Features Potomac Crossing needs from the engine are additive and ship as v1.0.x patch releases (UTM zone
+  from `map.frame.utmZone`, paged custom fetch sources, TIFF magic check, title negatives in the clean gate, then
+  water bodies / presets / lights), so Milestone B keeps `v1.1.0` as the SPEC names it. Each release re-runs E0
+  on bay-crossing first (D3).

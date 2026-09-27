@@ -173,8 +173,9 @@ if ( process.argv[ 1 ] === SELF && process.argv.includes( '--render' ) ) {
 
 }
 
-// the gate (exits the process); `extra` = [ [ label, () => failures[] ] ] title-specific checks
-export function runCleanGate( { label = 'G1', extra = [], negative = process.argv.includes( '--negative' ) } = {} ) {
+// the gate (exits the process); `extra` = [ [ label, () => failures[] ] ] title-specific checks, `negatives` =
+// [ [ name, failure prefix, () => failures[] ] ] their negative fixtures (run with the generic ones)
+export function runCleanGate( { label = 'G1', extra = [], negatives = [], negative = process.argv.includes( '--negative' ) } = {} ) {
 
 	if ( ! negative ) {
 
@@ -198,6 +199,7 @@ export function runCleanGate( { label = 'G1', extra = [], negative = process.arg
 		[ "undeclared package ('three')", 'audit:', () => checkAudit( [ [ 'src/fixture.js', "import * as THREE from 'three';\n" ] ] ) ],
 		[ 'ocean mesh never drawn', 'render-ocean:', () => renderChild( 'ocean' ) ],
 		[ 'sun frozen at noon', 'render-sky:', () => renderChild( 'sun' ) ],
+		...negatives,
 	];
 	let missed = 0;
 	for ( const [ name, tag, run ] of MUTATIONS ) {
