@@ -104,7 +104,8 @@ async function runOne( { dir, tier, mode, unclamped, views } ) {
 	} catch ( e ) {
 
 		r.errors.push( 'boot: ' + e.message.split( '\n' )[ 0 ] );
-		if ( H ) r.failures = H.GPU.failures.map( ( f ) => `${ f.label }: ${ f.message }` );
+		const { GPU } = await import( pathToFileURL( join( dir, 'src/engine/gpu/GPU.js' ) ).href ); // the same module instance the App used
+		r.failures = GPU.failures.map( ( f ) => `${ f.label }: ${ f.message }` );
 
 	}
 
