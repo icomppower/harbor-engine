@@ -1,48 +1,17 @@
-# SF Bay Crossing — SPEC
+# Harbor Engine — SPEC
 
-Source of truth: Notion page "SF Bay Crossing — SPEC.md (Opus 5.5)" (3e51f269eaea818ab5b1f2117068fcd7).
-§1, §4 and §5 are copied here; data sources (§2), the per-gate protocol (§6) and stop rules (§7) live on that
-page. Decisions (§3) are in `DECISIONS.md`.
+The full brief is the Notion page **"Harbor Engine — core engine SPEC (Opus 5.5)"** (page
+3e81f269eaea81a4930eea5080434611). This file keeps only what a session needs locally.
 
-## 1. Objective
-
-Replace Tidewater's island with a real-data **San Francisco Bay** scene: the Embarcadero waterfront at the
-**Ferry Building**, a ferry crossing past Alcatraz to the **Sausalito** waterfront, with the Golden Gate Bridge
-in view. Player can walk the Embarcadero and drive the ferry; time of day from golden hour to night. Desktop
-only, WebGPU.
-
-## 4. Environment and guardrails
-
-- Mac mini M4, 16 GB unified memory. One browser instance max. **Never run Blender and the dev server at the
-  same time.**
-- No subagents.
-- Commit and update `STATE.md` after every gate.
-- Never lower a threshold to pass. Never modify a frozen threshold without a `BLOCKED.md`.
-- Dependency audit: every import resolves to a dependency declared in package.json.
-- Cache all raw downloads in `data/raw/` with a checksum manifest; pipelines read from cache, not the network.
-
-## 5. Gates (`verify.sh`)
-
-Each gate must first **fail on a negative fixture** before a positive run counts. Values marked *calibrate*
-are measured at first run, written to `SPEC-THRESHOLDS.md`, then frozen.
-
-- **G0 Data check:** building heights, terrain, and bathymetry for the slice downloaded by script, cached,
-  checksummed; licences recorded.
-- **G1 Clean fork:** D7 removals done; `npm run build` passes; ocean + sky render in headless Dawn;
-  dependency audit passes.
-- **G2a Terrain + bathymetry pipeline:** raw → terrain/seabed tiles, byte-identical across two runs from cache.
-- **G2b Building pipeline:** footprints + heights → extruded building tiles, byte-identical across two runs
-  from cache.
-- **G2c Landmarks + LOD:** landmark GLBs (offline Blender) and building LODs merged per CDLOD tile; triangle
-  and draw-call caps (*calibrate*).
-- **G3 Georeference:** ≥5 control points (Ferry Building tower, pier ends, Coit Tower, Sausalito ferry landing,
-  a Golden Gate tower) within tolerance (*calibrate*, ≤10 m). A shifted dataset must fail.
-- **G4 Ferry:** Ferry Building → Sausalito crossing completes; duration within the cited schedule range; hull
-  never in water shallower than its draft on the route.
-- **G5 M4 budget:** scripted camera path at `low` tier; fps floor (*calibrate*, target ≥30 @ 1080p); GPU memory
-  cap; no swap during the run.
-- **G6 Look (advisory):** headless screenshots at fixed seed — golden hour, blue hour, night — in `shots/` for
-  human review.
-- **G7 Baseline-limits compile** (added 2026-09-26, D41): the real App on an adapter with only WebGPU's default
-  limits and no optional features; every pipeline compiles and every frame validates, all tiers, ferry + fly.
-- **DONE** = G0–G5 and G7 green in one clean `verify.sh` run. Create file `DONE`.
+- **Goal:** one engine for different maps and games, split into repos: `harbor-engine` (this), `harbor-game-<id>`,
+  title repos (`bay-crossing`, `potomac-crossing`, …), `harbor-site` (UI only). Contract: `docs/ENGINE.md`.
+- **Milestone A (before DC):** E0–E4 green → tag `v1.0.0`, Notion status page, then the Potomac Crossing SPEC.
+- **Milestone B (after DC is DONE):** E5–E7 green → tag `v1.1.0`.
+- **Gates:** E0 extract without change (oracle) · E1 contract · E2 baseline-GPU compile · E3 mobile look ·
+  E4 title template · E5 fishing game repo · E6 map without a city · E7 downstream check. Each fails on a
+  negative fixture first. *calibrate* values are frozen in `SPEC-THRESHOLDS.md`.
+- **Protocol:** lowest non-green gate → prove the negative fails → implement → `./verify.sh` → STATE.md →
+  RUNLOG.md line → commit `<gate>: <pass|fail> — <summary>`. Stop with `BLOCKED.md` + a Notion page on 3 failed
+  attempts in a row, manual data, or a frozen threshold / decision change.
+- **Guardrails:** Mac mini M4 16 GB, one browser, never Blender and a dev server together, no subagents, never
+  lower a threshold to pass.

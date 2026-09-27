@@ -1,29 +1,30 @@
-// G2a pipeline: cached 3DEP land + NCEI seabed → one merged heightfield in the bay frame → tiles.
-//   node tools/terrain/build.mjs [--raw <dir>] [--out <dir>]
+// Terrain pipeline: cached land DEM + seabed DEM (map.json `terrain`) → one merged heightfield in the title
+// frame → tiles. Run from the title: node node_modules/harbor-engine/tools/terrain/build.mjs [--raw <dir>] [--out <dir>]
 // Output (default public/terrain/): index.json + t_<i>_<j>.bin, each a zlib-deflated Int16LE grid of
 // heights in centimetres above local MSL (row-major, row 0 = north). Deterministic: no clocks, no
 // randomness, fixed zlib settings.
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { readTiff } from '../geo/tiff.mjs';
 import { readCached, RAW } from '../data/cache.mjs';
 import { dehaze } from '../geo/naip.mjs';
+import { TITLE, loadMap, gridOf, isMain } from '../lib/title.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = TITLE;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 
-// World grid: square domain centred on the frame origin (src/world/BayFrame.js), 3 m cells.
-export const GRID = { originE: 549504, originN: 4186800, size: 9600, res: 3200, tile: 200 };
+// World grid: square domain centred on the frame origin (map.json `frame`), 3 m cells.
+export const GRID = gridOf();
+const T = loadMap().terrain, F = loadMap().frame;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 
 export function mergeHeights({ rawDir = RAW } = {}) {
-  const land = readTiff(readCached('terrain-3dep.tif', rawDir));
-  const sea = readTiff(readCached('bathy-ncei.tif', rawDir));
-  const datums = JSON.parse(readCached('noaa-datums-9414290.json', rawDir).toString('utf8'));
+  const land = readTiff(readCached(T.land, rawDir));
+  const sea = readTiff(readCached(T.sea, rawDir));
+  const datums = JSON.parse(readCached(T.datum, rawDir).toString('utf8'));
   const dv = n => datums.datums.find(d => d.name === n).value;
   const msl = dv('MSL') - dv('NAVD88'); // local MSL above NAVD88 (m)
   // both rasters share the slice grid; its NW corner and cell size come from the GeoTIFF tags
@@ -53,7 +54,7 @@ export function mergeHeights({ rawDir = RAW } = {}) {
 // mud there) and channels keep 6 bits: 4.0 MB instead of 15.4 MB (D39).
 export const AERIAL_WATER_BELOW = -1.5, AERIAL_BITS = 6, AERIAL_LAND_MEDIAN = 105;
 export function aerialMap({ rawDir = RAW, merged } = {}) {
-  const t = readTiff(readCached('naip-bay.tif', rawDir));
+  const t = readTiff(readCached(T.aerial, rawDir));
   merged = merged || mergeHeights({ rawDir });
   const [R, G, B] = t.bands, W = t.width, H = t.height, cell = t.tags[33550][0];
   const { res, size } = GRID, texel = size / res, keep = 0xff << (8 - AERIAL_BITS) & 0xff;
@@ -92,24 +93,24 @@ export function writeTiles(merged, outDir, aerial = null) {
   }
   const index = {
     format: 'bay-terrain/1', size, res, texel: size / res, tile, tiles: n,
-    frame: 'BayFrame: x east, z south, origin UTM 10N E 549504 N 4186800; row 0 = north edge',
+    frame: `BayFrame: x east, z south, origin UTM ${F.utmZone}${F.hemisphere || 'N'} E ${F.originE} N ${F.originN}; row 0 = north edge`,
     heights: 'Int16LE centimetres above local MSL, zlib deflate',
-    verticalDatum: `local MSL = NAVD88 + ${merged.msl.toFixed(3)} m (NOAA station 9414290, epoch ${merged.epoch})`,
-    sources: ['terrain-3dep.tif (land)', 'bathy-ncei.tif (seabed)', 'noaa-datums-9414290.json (datum)'],
+    verticalDatum: `local MSL = NAVD88 + ${merged.msl.toFixed(3)} m (NOAA station ${T.datumStation}, epoch ${merged.epoch})`,
+    sources: [`${T.land} (land)`, `${T.sea} (seabed)`, `${T.datum} (datum)`],
     files,
   };
   if (aerial) {
     const bin = deflateSync(aerial.rgb, { level: 9, memLevel: 9, strategy: 0 });
     writeFileSync(join(outDir, 'aerial.bin'), bin);
     index.aerial = { file: 'aerial.bin', width: aerial.width, height: aerial.height, cell: aerial.cell,
-      format: `RGB8 sRGB (${AERIAL_BITS} significant bits), row 0 = north, same square as the heightfield, zlib deflate; 0,0,0 = water`, source: 'naip-bay.tif (haze corrected)',
+      format: `RGB8 sRGB (${AERIAL_BITS} significant bits), row 0 = north, same square as the heightfield, zlib deflate; 0,0,0 = water`, source: `${T.aerial} (haze corrected)`,
       sha256: createHash('sha256').update(bin).digest('hex') };
   }
   writeFileSync(join(outDir, 'index.json'), JSON.stringify(index, null, 1) + '\n');
   return index;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const t0 = performance.now();
   const merged = mergeHeights({ rawDir: arg('--raw', RAW) });
   const index = writeTiles(merged, arg('--out', join(root, 'public/terrain')), aerialMap({ rawDir: arg('--raw', RAW), merged }));

@@ -1,4 +1,6 @@
 import { icon, brandMark } from './icons.js';
+import { MAP } from '../map/configure.js';
+import { WAYPOINTS } from '../world/Waypoints.js';
 
 // Tidewater UI: settings panel (tabs → folders → controls), HUD, help,
 // photo mode, start overlay and loader. Plain DOM, no dependencies.
@@ -1938,7 +1940,7 @@ export class UI {
 		this.sparkEl = stats.querySelector( '.tw-spark' );
 
 		const brand = h( 'div', 'tw-brand' );
-		brand.innerHTML = `${ brandMark() }<span class="tw-brand-name">BAY CROSSING</span>`;
+		brand.innerHTML = `${ brandMark() }<span class="tw-brand-name">${ esc( MAP.current.ui.brand || MAP.current.ui.title.toUpperCase() ) }</span>`;
 		this.modeEl = h( 'div', 'tw-mode is-empty', { role: 'status' } );
 		this.modeIco = h( 'span', 'tw-mode-ico' );
 		this.modeText = h( 'span', 'tw-mode-text' );
@@ -2149,9 +2151,9 @@ export class UI {
 						<h3>Interact</h3>
 						${ row( k( 'E' ), 'Interact<small>Take the ferry helm, step ashore</small>' ) }
 						${ row( k( 'V' ), 'Boat camera<small>1st / 3rd person</small>' ) }
-						${ row( k( 'G' ), 'Ferry autopilot<small>Sails the route to Sausalito</small>' ) }
+						${ row( k( 'G' ), `Ferry autopilot<small>${ MAP.current.ui.autopilotHelp || 'Sails the published route' }</small>` ) }
 						${ row( k( 'F' ), 'Free camera<small>Or walk on from a waypoint</small>' ) }
-						${ row( k( '1' ) + k( '8' ), 'Waypoints<small>Fly to a landmark; N = next</small>' ) }
+						${ row( k( '1' ) + k( String( Math.max( 1, WAYPOINTS.length ) ) ), 'Waypoints<small>Fly to a landmark; N = next</small>' ) }
 						${ row( k( 'K' ), 'Landmark signs<small>Click one (or aim + click) to fly there</small>' ) }
 						${ row( k( 'T' ), 'Pause time' ) }
 						${ row( k( 'L' ), 'Flashlight' ) }
@@ -2166,7 +2168,7 @@ export class UI {
 					</section>
 				</div>
 				<div class="tw-help-guide">
-					<span><b>How to play:</b> walk the Embarcadero, take the ferry helm at Ferry Building Gate C and cross to Sausalito, by hand or with the autopilot (G). Keys 1–8 fly to the landmarks.</span>
+					<span><b>How to play:</b> ${ MAP.current.ui.howToPlay || '' }</span>
 					<button type="button" class="gm-btn is-ghost tw-help-replay" hidden>Replay the guide</button>
 				</div>
 			</div>`;
@@ -2187,7 +2189,7 @@ export class UI {
 		el.innerHTML = `
 			<div class="tw-start-inner">
 				${ brandMark( 'tw-start-mark' ) }
-				<div class="tw-start-title">BAY CROSSING</div>
+				<div class="tw-start-title">${ esc( MAP.current.ui.brand || MAP.current.ui.title.toUpperCase() ) }</div>
 				<button type="button" class="tw-start-cta"><span class="tw-start-pulse" aria-hidden="true"></span>${ icon( 'mouse' ) }<span>Click to explore</span></button>
 				<div class="tw-start-touch">Left thumb: walk (or drive the ferry) · drag: look · <b>E</b>: ferry helm · <b>G</b>: autopilot</div>
 				<div class="tw-start-keys">

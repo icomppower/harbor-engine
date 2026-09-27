@@ -1,28 +1,38 @@
-// Offline landmark build: prepare inputs from the cache, run Blender headless, index the LOD GLBs.
-//   node tools/landmarks/build.mjs [--raw <dir>] [--out <dir>]      (BLENDER=/path/to/blender to override)
+// Offline landmark build: the title's hooks.js `prepareLandmarks( { rawDir, grid, mergeHeights } )` turns the
+// cache into Blender inputs, the title's Blender script (map.json `landmarkScript`, default
+// pipelines/landmarks/build.py) builds three LODs per landmark headless, and this indexes the LOD GLBs.
+//   node node_modules/harbor-engine/tools/landmarks/build.mjs [--raw <dir>] [--out <dir>]   (BLENDER=… to override)
+// Never run Blender while a dev server is up (M4 memory).
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { RAW } from '../data/cache.mjs';
-import { prepareLandmarks } from './prepare.mjs';
+import { mergeHeights, GRID } from '../terrain/build.mjs';
+import { TITLE, loadMap, isMain } from '../lib/title.mjs';
 import { parseGLB } from '../../src/engine/loaders/GLTF.js';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = TITLE;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 export const LOD_DISTANCES = [1500, 5000]; // m: LOD0 nearer than 1.5 km, LOD1 to 5 km, LOD2 beyond
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+export async function prepareLandmarks({ rawDir = RAW } = {}) {
+  const hooks = await import(pathToFileURL(join(root, 'hooks.js')).href);
+  if (typeof hooks.prepareLandmarks !== 'function') throw new Error(`${join(root, 'hooks.js')} must export prepareLandmarks( ctx )`);
+  return hooks.prepareLandmarks({ rawDir, grid: GRID, mergeHeights });
+}
+
+if (isMain(import.meta.url)) {
   const out = arg('--out', join(root, 'public/landmarks'));
-  const input = prepareLandmarks({ rawDir: arg('--raw', RAW) });
+  const input = await prepareLandmarks({ rawDir: arg('--raw', RAW) });
   const inFile = join(root, '.verify', 'landmarks-input.json');
   mkdirSync(dirname(inFile), { recursive: true });
   writeFileSync(inFile, JSON.stringify(input) + '\n');
   mkdirSync(out, { recursive: true });
   for (const f of readdirSync(out)) if (f.endsWith('.glb') || f === 'index.json') rmSync(join(out, f));
   const blender = process.env.BLENDER || 'blender';
-  const r = spawnSync(blender, ['-b', '--factory-startup', '--python', join(root, 'tools/landmarks/build.py'), '--', inFile, out], { encoding: 'utf8', maxBuffer: 1 << 26 });
+  const r = spawnSync(blender, ['-b', '--factory-startup', '--python', join(root, loadMap().landmarkScript || 'pipelines/landmarks/build.py'), '--', inFile, out], { encoding: 'utf8', maxBuffer: 1 << 26 });
   if (r.status !== 0 || /Traceback|Error:/.test(r.stdout + r.stderr)) { console.error(r.stdout.slice(-3000), r.stderr.slice(-3000)); process.exit(1); }
   const index = { format: 'bay-landmarks/1', lodDistances: LOD_DISTANCES, blender: (r.stdout.match(/Blender \d\S*/) || [''])[0], landmarks: [] };
   for (const L of input.landmarks) {

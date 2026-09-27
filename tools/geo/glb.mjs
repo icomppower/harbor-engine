@@ -3,7 +3,7 @@
 const TYPE = { 1: 'SCALAR', 2: 'VEC2', 3: 'VEC3', 4: 'VEC4' };
 const CT = { Float32Array: 5126, Uint32Array: 5125, Uint16Array: 5123, Uint8Array: 5121, Int16Array: 5122, Int8Array: 5120 };
 
-export function writeGLB( { meshes, generator = 'bay-crossing', extras = undefined } ) {
+export function writeGLB( { meshes, generator = 'harbor-engine', extras = undefined } ) {
 
 	const chunks = [], bufferViews = [], accessors = [];
 	let offset = 0;

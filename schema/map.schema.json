@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/icomppower/harbor-engine/schema/map.schema.json",
+  "title": "Harbor Engine title map",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "frame",
+    "bbox",
+    "slice",
+    "sources",
+    "terrain",
+    "vessel",
+    "route",
+    "water",
+    "sun",
+    "layout",
+    "ui",
+    "capabilities",
+    "games"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "frame": {
+      "type": "object",
+      "required": [
+        "crs",
+        "utmZone",
+        "hemisphere",
+        "originE",
+        "originN",
+        "size"
+      ],
+      "properties": {
+        "crs": {
+          "type": "string"
+        },
+        "utmZone": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "hemisphere": {
+          "enum": [
+            "N",
+            "S"
+          ]
+        },
+        "originE": {
+          "type": "number"
+        },
+        "originN": {
+          "type": "number"
+        },
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "bbox": {
+      "type": "object",
+      "required": [
+        "south",
+        "west",
+        "north",
+        "east"
+      ],
+      "properties": {
+        "south": {
+          "type": "number"
+        },
+        "west": {
+          "type": "number"
+        },
+        "north": {
+          "type": "number"
+        },
+        "east": {
+          "type": "number"
+        }
+      }
+    },
+    "slice": {
+      "type": "object",
+      "required": [
+        "extent"
+      ],
+      "properties": {
+        "extent": {
+          "type": "object",
+          "required": [
+            "minE",
+            "minN",
+            "maxE",
+            "maxN"
+          ],
+          "properties": {
+            "minE": {
+              "type": "number"
+            },
+            "minN": {
+              "type": "number"
+            },
+            "maxE": {
+              "type": "number"
+            },
+            "maxN": {
+              "type": "number"
+            }
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "licence"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "licence": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "terrain": {
+      "type": "object",
+      "required": [
+        "land",
+        "sea",
+        "datum",
+        "datumStation",
+        "aerial"
+      ],
+      "properties": {
+        "land": {
+          "type": "string"
+        },
+        "sea": {
+          "type": "string"
+        },
+        "datum": {
+          "type": "string"
+        },
+        "datumStation": {
+          "type": "string"
+        },
+        "aerial": {
+          "type": "string"
+        }
+      }
+    },
+    "controlPoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "lat",
+          "lon"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "ref": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "required": [
+        "name",
+        "source",
+        "length",
+        "beam",
+        "draft",
+        "topSpeedKn",
+        "hullWidth",
+        "hullSpacing",
+        "deckY",
+        "mass"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "beam": {
+          "type": "number"
+        },
+        "draft": {
+          "type": "number"
+        },
+        "topSpeedKn": {
+          "type": "number"
+        },
+        "hullWidth": {
+          "type": "number"
+        },
+        "hullSpacing": {
+          "type": "number"
+        },
+        "deckY": {
+          "type": "number"
+        },
+        "mass": {
+          "type": "number"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "required": [
+        "file",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "schedule": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    },
+    "landmarks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "slug",
+          "name"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "water": {
+      "type": "object",
+      "required": [
+        "preset",
+        "swellDir"
+      ],
+      "properties": {
+        "preset": {
+          "enum": [
+            "bay",
+            "calm-river",
+            "still-pool",
+            "ocean"
+          ]
+        },
+        "swellDir": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "optics": {
+          "type": "object",
+          "required": [
+            "absorption",
+            "scattering"
+          ],
+          "properties": {
+            "absorption": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "scattering": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        }
+      }
+    },
+    "sun": {
+      "type": "object",
+      "required": [
+        "latitude",
+        "declination"
+      ],
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "declination": {
+          "type": "number"
+        }
+      }
+    },
+    "palettes": {
+      "type": "object",
+      "required": [
+        "walls",
+        "roofs"
+      ],
+      "properties": {
+        "walls": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "roofs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "required": [
+        "anchorUTM",
+        "pier",
+        "boatDock",
+        "start"
+      ],
+      "properties": {
+        "anchorUTM": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "pier": {
+          "type": "object",
+          "required": [
+            "dx",
+            "dzStart",
+            "dzEnd",
+            "deckHeight",
+            "width",
+            "headWidth",
+            "headDepth"
+          ],
+          "properties": {
+            "dx": {
+              "type": "number"
+            },
+            "dzStart": {
+              "type": "number"
+            },
+            "dzEnd": {
+              "type": "number"
+            },
+            "deckHeight": {
+              "type": "number"
+            },
+            "width": {
+              "type": "number"
+            },
+            "headWidth": {
+              "type": "number"
+            },
+            "headDepth": {
+              "type": "number"
+            }
+          }
+        },
+        "boatDock": {
+          "type": "object",
+          "required": [
+            "dx",
+            "dz",
+            "heading"
+          ],
+          "properties": {
+            "dx": {
+              "type": "number"
+            },
+            "dz": {
+              "type": "number"
+            },
+            "heading": {
+              "type": "number"
+            }
+          }
+        },
+        "start": {
+          "type": "object",
+          "required": [
+            "dx",
+            "dz",
+            "yaw"
+          ],
+          "properties": {
+            "dx": {
+              "type": "number"
+            },
+            "dz": {
+              "type": "number"
+            },
+            "yaw": {
+              "type": "number"
+            }
+          }
+        },
+        "reef": {
+          "type": "object",
+          "required": [
+            "center",
+            "radius"
+          ],
+          "properties": {
+            "center": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "radius": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "places": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "x",
+          "z"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "x": {
+            "type": "number"
+          },
+          "z": {
+            "type": "number"
+          },
+          "model": {
+            "type": "boolean"
+          },
+          "r": {
+            "type": "number"
+          },
+          "waypoint": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "waypoints": {
+      "type": "array",
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "eye",
+          "at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "eye": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "at": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "brand": {
+          "type": "string"
+        },
+        "autopilot": {
+          "type": "string"
+        },
+        "autopilotHelp": {
+          "type": "string"
+        },
+        "howToPlay": {
+          "type": "string"
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "water",
+          "vessel",
+          "route",
+          "buildings",
+          "landmarks",
+          "habitats",
+          "spawnZones"
+        ]
+      }
+    },
+    "games": {
+      "type": "object",
+      "required": [
+        "default"
+      ],
+      "properties": {
+        "default": {
+          "type": "string"
+        },
+        "available": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "streaming": {
+      "const": false
+    }
+  }
+}

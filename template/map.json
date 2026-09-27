@@ -1,0 +1,31 @@
+{
+  "id": "{{id}}",
+  "name": "{{name}}",
+  "frame": { "crs": "placeholder: set the UTM zone of the real slice", "utmZone": 18, "hemisphere": "N", "originE": 500000, "originN": 4000000, "size": 3000 },
+  "bbox": { "south": 36.13, "west": -75.02, "north": 36.16, "east": -74.98 },
+  "slice": { "extent": { "minE": 498500, "minN": 3998500, "maxE": 501500, "maxN": 4001500 }, "note": "placeholder: a procedural island in open water (tools/placeholder/build.mjs)" },
+  "sources": [ { "id": "placeholder", "file": "", "licence": "Procedural (Harbor Engine placeholder data)", "url": "" } ],
+  "terrain": { "land": "placeholder", "sea": "placeholder", "datum": "placeholder", "datumStation": "none", "aerial": "none" },
+  "controlPoints": [],
+  "vessel": { "name": "Placeholder catamaran", "source": "placeholder: cite a real vessel on the title's route", "length": 30, "beam": 9, "draft": 1.5, "topSpeedKn": 25, "hullWidth": 2.4, "hullSpacing": 6.4, "deckY": 2.2, "mass": 60000 },
+  "route": { "file": "ferry/route.json", "from": "East dock", "to": "West dock", "source": "placeholder" },
+  "landmarks": [],
+  "water": { "preset": "bay", "swellDir": [ 1, 0.12 ] },
+  "sun": { "latitude": 36.14, "declination": -0.5 },
+  "palettes": {
+    "walls": { "tower": [ [ 150, 156, 162 ] ], "mid": [ [ 182, 178, 170 ] ], "house": [ [ 214, 206, 192 ] ], "pier": [ [ 210, 200, 178 ] ] },
+    "roofs": { "city": [ [ 118, 116, 110 ] ] }
+  },
+  "layout": {
+    "anchorUTM": [ 500576, 4000000 ],
+    "pier": { "dx": -40, "dzStart": -40, "dzEnd": 40, "deckHeight": 2.3, "width": 8, "headWidth": 14, "headDepth": 7 },
+    "boatDock": { "dx": 0, "dz": 0, "heading": 0 },
+    "start": { "dx": -330, "dz": 0, "yaw": -1.5707963267948966 }
+  },
+  "places": [],
+  "waypoints": [ { "name": "Island", "eye": [ 700, 60, 300 ], "at": [ 0, 20, 0 ] } ],
+  "ui": { "title": "{{name}}", "autopilot": "East dock → West dock", "autopilotHelp": "Sails the route round the island", "howToPlay": "placeholder map: replace public/ with the title's real data." },
+  "capabilities": [ "water", "vessel", "route" ],
+  "games": { "default": "sightseeing", "available": [ "sightseeing" ] },
+  "streaming": false
+}

@@ -19,13 +19,15 @@ import { Clouds } from './sky/Clouds.js';
 import { SkyProClouds } from './sky/SkyProClouds.js';
 import { Environment } from './sky/Environment.js';
 
-import { loadBayHeightField } from './world/BayTerrain.js';
-import { loadBayBuildings } from './world/BayBuildings.js';
+import { loadHeightField } from './world/TerrainTiles.js';
+import { loadBuildingTiles } from './world/BuildingTiles.js';
 import { loadLandmarks } from './world/Landmarks.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
+import { MAP } from './map/configure.js';
+import { startGame } from './games.js';
 import { Colliders } from './world/Colliders.js';
 import { FerryModel } from './world/FerryModel.js';
 
@@ -132,7 +134,7 @@ export class App {
 		// The bay's terrain + seabed heightfield (3DEP land, NCEI seabed, local MSL; public/terrain/). The
 		// shore field, GPU textures and terrain mesh are all derived from it.
 		await progress( 0.06, 'Laying the bay floor…' );
-		this.terrainData = await loadBayHeightField();
+		this.terrainData = await loadHeightField();
 		this.colliders = new Colliders();
 		await progress( 0.19, 'Rolling in the swell…' );
 		this.shoreField = computeShoreField( this.terrainData, { res: 512, swellDir: [ WORLD.swellDir.x, WORLD.swellDir.y ] } );
@@ -140,26 +142,26 @@ export class App {
 		// the terrain applies the heightfield sun shadow (long hill shadows) in its own lighting
 		this.terrain = new Terrain( { scene, terrainData: this.terrainData, terrainGPU: this.terrainGPU, renderer } );
 		this.terrain.mesh.material.appliesHillShadow = true;
-		// SF + Sausalito buildings, extruded from footprints and LiDAR / OSM heights (public/buildings/)
+		// the title's buildings, extruded from footprints + heights by its pipeline (public/buildings/)
 		await progress( 0.22, 'Raising the city…' );
-		this.buildings = await loadBayBuildings();
+		this.buildings = await loadBuildingTiles();
 		scene.add( this.buildings );
-		// Golden Gate Bridge, Ferry Building, Coit Tower, Transamerica, Alcatraz (offline Blender LOD GLBs)
+		// the title's landmarks (offline Blender LOD GLBs, public/landmarks/)
 		this.landmarks = await loadLandmarks();
 		scene.add( this.landmarks );
 		this.buildings.userData.lodBias = this.landmarks.userData.lodBias = Q.lodBias;
 		this.roofs = new RoofGrid( [ ...this.buildings.children.map( ( t ) => t.userData.lods[ 0 ] ), ...this.landmarks.children.map( ( l ) => l.userData.lods[ 0 ] ) ], WORLD.terrainSize );
 
-		// the ferry (MV Golden Gate class) and its route Ferry Building → Sausalito (public/ferry/)
+		// the title's vessel (map.json `vessel`) and its route (map.json `route`, public/ferry/)
 		const base = ( import.meta.env && import.meta.env.BASE_URL ) || '/';
-		this.ferryRoute = await ( await fetch( base + 'ferry/route.json' ) ).json();
+		this.ferryRoute = await ( await fetch( base + ( MAP.current.route.file || 'ferry/route.json' ) ) ).json();
 		this.boat = new FerryModel();
 		scene.add( this.boat.group );
 
 		// ---------------------------------------------------------------- ocean
 		await progress( 0.3, 'Simulating the ocean…' );
 		this.fft = new OceanFFT( renderer );
-		// SF Bay's turbid water (WORLD.water) instead of Tidewater's clear tropical sea
+		// the title's water optics (map.json `water.optics`, WORLD.water)
 		G.waterAbsorption.value.set( ...WORLD.water.absorption );
 		G.waterScattering.value.set( ...WORLD.water.scattering );
 		this.foamTexture = createFoamTexture( renderer );
@@ -381,6 +383,9 @@ export class App {
 
 		}
 
+		// the game (map.json `games`, ?game=<id>); the built-in sightseeing game needs no module
+		this.game = await startGame( this, MAP.current );
+
 	}
 
 	// ---------------------------------------------------------------- sun / sky
@@ -459,7 +464,7 @@ export class App {
 			this.boatCtl.moored = false;
 
 		} else this.autopilot = null;
-		if ( this.ui ) this.ui.ui.toast( on ? 'Autopilot: Ferry Building → Sausalito' : 'Autopilot off' );
+		if ( this.ui ) this.ui.ui.toast( on ? 'Autopilot: ' + MAP.current.ui.autopilot : 'Autopilot off' );
 
 	}
 
@@ -620,6 +625,7 @@ export class App {
 		if ( this.freeCam ) this.fly.update( dt );
 		else this.player.update( dt );
 		if ( this.autopilot ) this.autopilot.update( this.boatCtl, dt );
+		if ( this.game && this.game.update ) this.game.update( this, dt );
 		this.updateSun();
 
 		this.atmosphere.update( dt, this.camera.position.y );

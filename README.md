@@ -1,82 +1,28 @@
-# SF Bay Crossing
+# Harbor Engine
 
-San Francisco Bay in the browser, built from real data: walk the Embarcadero at the Ferry Building, take the
-helm of a Golden Gate Ferry catamaran past Alcatraz to Sausalito, and watch the Golden Gate Bridge from golden
-hour to the lit-up night skyline. It runs directly on WebGPU and WGSL, on the engine of
-[Tidewater](https://github.com/dgreenheck/tidewater) (MIT), whose ocean, sky and post-processing it keeps.
+**Harbor Engine — built on Tidewater.** A WebGPU/WGSL engine for real-data waterfronts: FFT ocean with
+shore waves and wakes, physically based sky, atmosphere and clouds, post-processing, a walker, a free camera and
+a vessel with its autopilot, plus the offline pipelines that turn public datasets (DEMs, bathymetry, building
+footprints, aerial imagery, Blender landmarks, published routes) into baked tiles, and the gate framework that
+proves each step. No three.js: the renderer is its own.
 
-**Play it:** https://icomppower.github.io/bay-crossing/
+Each map is its own **title** repo that pins an engine version; each game is its own **game** repo; the portal
+is `harbor-site`. The contract between them is [`docs/ENGINE.md`](docs/ENGINE.md).
 
-![Golden hour from the ferry deck, mid-bay](shots/golden-hour.png)
-
-| Blue hour | Night |
-|---|---|
-| ![Blue hour](shots/blue-hour.png) | ![Night](shots/night.png) |
-
-## What's real
-
-- **Terrain and seabed:** USGS 3DEP lidar elevation on land, NOAA NCEI topobathy below the water, merged on a
-  3 m grid and set to local mean sea level (NOAA tide station 9414290).
-- **Buildings:** 8,452 San Francisco footprints with the city's LiDAR-derived roof heights (DataSF) and 1,823
-  Sausalito buildings from OpenStreetMap, extruded with procedural facades and three levels of detail.
-- **Landmarks:** Golden Gate Bridge, Ferry Building, Coit Tower, Transamerica Pyramid and Alcatraz, built
-  procedurally in Blender from OpenStreetMap positions and published dimensions. Checked against NOAA nautical
-  charts to within 1–7 m.
-- **Ferry:** the dimensions of MV *Golden Gate* (43.7 m catamaran, 1.5 m draft), on a route planned over the
-  bathymetry from Ferry Building Gate C to the Sausalito landing. The autopilot crossing takes about 18 minutes;
-  the published timetable allows 30.
-
-Known gaps: the heights date from 2016 (no Salesforce Tower), the Embarcadero piers aren't walkable yet, and
-the ferry is helm-only.
-
-## Controls
-
-| Key | Action |
-|---|---|
-| W A S D, mouse | Walk and look (click to capture the mouse) |
-| E | Take the ferry helm / step ashore |
-| W / S, A / D at the helm | Waterjets ahead / astern, steer |
-| G | Ferry autopilot to Sausalito |
-| T | Let the day run (golden hour → night) |
-| F | Free camera (from a waypoint: walk on from there) |
-| 1–8, N | Fly to a waypoint: Ferry Building, Transamerica, Coit Tower, Alcatraz, Golden Gate, Sausalito, mid-bay, city from above (N = next; also the Explore tab) |
-| K | Landmark signs on / off (18 SF landmarks with distances; click or tap one to fly there, or aim at it and click while the mouse is captured) |
-| H, F1 | Settings, all controls |
-
-**On a phone or tablet:** the left thumb joystick walks (or drives the ferry at the helm), dragging anywhere
-else looks around, and on-screen buttons cover E, G, jump, camera, time, free camera and N (next waypoint); tap a landmark sign to fly there. The Explore tab (compass icon on the right edge) lists all waypoints. A lighter `mobile`
-quality tier is picked automatically.
-
-It needs a browser with WebGPU (a recent Chrome, Edge or Safari, including iOS 26 Safari and Android Chrome). On a Mac mini M4 it holds ~50 fps at
-1080p on the `low` tier. The first load compiles the shaders and can take a minute.
-
-## Run locally
-
-```
-npm install
-npm run dev          # http://127.0.0.1:5189
+```sh
+npx github:icomppower/harbor-engine#v1.0.0 new-title my-harbour   # a title with placeholder data
+cd my-harbour && npm run dev
 ```
 
-## Data pipeline and checks
+| Title | Live |
+|-------|------|
+| [bay-crossing](https://github.com/icomppower/bay-crossing) | https://icomppower.github.io/bay-crossing/ |
 
-The shipped tiles in `public/` are built from cached downloads by deterministic scripts:
+## Engine gates
 
-```
-npm run fetch-data               # 9 sources into data/raw/ (gitignored), with a checksum manifest
-node tools/terrain/build.mjs     # → public/terrain
-node tools/buildings/build.mjs   # → public/buildings
-node tools/landmarks/build.mjs   # → public/landmarks (needs Blender 5.x; BLENDER=/path/to/blender)
-node tools/ferry/prepare.mjs && node tools/ferry/route.mjs   # → public/ferry
-./verify.sh                      # gates G0–G6 (~20 min, headless WebGPU)
-```
+`./verify.sh` runs E0–E4 (`gates/gates.json`); every gate first proves its negative fixtures fail. State is in
+`STATE.md`, frozen thresholds in `SPEC-THRESHOLDS.md`.
 
-Each gate in `gates/` must first fail on a deliberately broken fixture, then pass for real. They cover data
-checksums and licences, the clean fork, byte-identical pipelines, LOD and triangle caps, georeference against
-NOAA charts, the ferry crossing (duration and draft clearance), and the M4 frame-time and GPU-memory budget.
-Calibrated limits are frozen in `SPEC-THRESHOLDS.md`, and the reasoning is in `DECISIONS.md`.
+## Licence
 
-## Credits and licences
-
-Code: MIT (see `LICENSE`, Tidewater's). Data: DataSF building footprints (PDDL), OpenStreetMap (ODbL,
-© OpenStreetMap contributors), USGS 3DEP and NOAA NCEI / CO-OPS / ENC (public domain). Golden Gate Ferry's GTFS
-feed is used only for facts: terminal positions and trip times. Full details are in `CREDITS.md`.
+MIT. Built on [Tidewater](https://github.com/dgreenheck/tidewater) (MIT); see `CREDITS.md`.

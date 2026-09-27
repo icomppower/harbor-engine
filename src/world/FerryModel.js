@@ -1,6 +1,6 @@
 import { BufferAttribute, BufferGeometry, Group, Mesh, Vector3 } from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
-import { FERRY } from './FerrySpec.js';
+import { FERRY } from './VesselSpec.js';
 
 const RHO = 1025;
 
@@ -50,7 +50,7 @@ class FerryLines {
 
 }
 
-// Procedural MV Golden Gate-class passenger catamaran (FerrySpec.js): two demihulls, wet deck, main and upper
+// Procedural passenger catamaran (VesselSpec.js): two demihulls, wet deck, main and upper
 // cabins with window bands, wheelhouse, mast. One mesh, vertex-coloured. Implements the hull interface the
 // boat systems use (lines, hydro, hullSamples, anchors, lights, hull volume); helmOnly: boarding goes straight
 // to the helm (no deck walking on the ferry in run 1, D35).

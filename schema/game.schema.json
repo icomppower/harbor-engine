@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/icomppower/harbor-engine/schema/game.schema.json",
+  "title": "Harbor Engine game",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "version",
+    "requires",
+    "entry"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "engine": {
+      "type": "string"
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "water",
+          "vessel",
+          "route",
+          "buildings",
+          "landmarks",
+          "habitats",
+          "spawnZones"
+        ]
+      }
+    },
+    "entry": {
+      "type": "string"
+    }
+  }
+}

@@ -617,7 +617,7 @@ const TERRAIN_SURFACE = /* wgsl */`
 	}
 
 #if HAS_AERIAL
-	// San Francisco Bay: land takes its colour from the aerial map (a little of the procedural detail kept as
+	// With an aerial map: land takes its colour from the aerial map (a little of the procedural detail kept as
 	// texture) and loses the beach's sand-ripple relief (streets, plazas and lawns are flat at this scale); the
 	// seabed is bay mud instead of coral sand and seagrass (D39)
 	let aerial = pow( textureSample( terrainAerial, smpLinearClamp, terrainUvOf( xz ) ).rgb, vec3f( 2.2 ) );

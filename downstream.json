@@ -1,0 +1,6 @@
+{
+  "note": "Titles built on this engine. verify-downstream bumps each to a candidate engine and runs its gates before a release is tagged (D3, E7). `path`: local checkout used by the E-gates.",
+  "titles": [
+    { "id": "bay-crossing", "repo": "icomppower/bay-crossing", "path": "../bay-crossing", "live": "https://icomppower.github.io/bay-crossing/" }
+  ]
+}

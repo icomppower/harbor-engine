@@ -82,7 +82,7 @@ export class AppUI {
 
 		const clarity = () => {
 
-			// scale absorption/scattering around the bay's turbid water (WORLD.water)
+			// scale absorption/scattering around the title's water optics (WORLD.water)
 			const k = 1 / Math.max( 0.2, s.clarity );
 			G.waterAbsorption.value.set( ...WORLD.water.absorption ).multiplyScalar( 0.6 + 0.4 * k );
 			G.waterScattering.value.set( ...WORLD.water.scattering ).multiplyScalar( k * k );

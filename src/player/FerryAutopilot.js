@@ -1,4 +1,4 @@
-import { KNOT } from '../world/FerrySpec.js';
+import { KNOT } from '../world/VesselSpec.js';
 
 // Helmsman for the ferry (public/ferry/route.json): pure-pursuit steering along the route legs and a speed
 // plan — harbour speed near the terminals, cruise speed on the open bay, braking to a stop at the berth.

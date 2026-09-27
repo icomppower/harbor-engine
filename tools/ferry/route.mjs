@@ -1,6 +1,7 @@
-// Ferry route: Ferry Building → Sausalito, planned offline over the shipped bathymetry (public/terrain) with
-// the building footprints (public/buildings, pier sheds over the water) and OSM piers as obstacles.
-//   node tools/ferry/route.mjs [--raw <dir>] [--out <file>]
+// Vessel route between the title's two terminals (map.json `route`), planned offline over the shipped
+// bathymetry (public/terrain) with the building footprints (public/buildings, pier sheds over the water) and
+// OSM piers as obstacles. Terminals come from the title's public/ferry/schedule.json (`route.planner`).
+//   node node_modules/harbor-engine/tools/ferry/route.mjs [--raw <dir>] [--out <file>]      (from the title)
 // A* on a 6 m grid; a cell is navigable where the water at MSL is at least DEPTH_OPEN deep (draft + under-keel
 // clearance + MSL→MLLW, so the route also holds at mean lower low water), relaxed to DEPTH_BERTH within
 // BERTH_ZONE of each terminal. Cost grows near shallows / obstacles to keep the ferry off them. The path is then
@@ -8,21 +9,21 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { readCached, RAW } from '../data/cache.mjs';
 import { toUTM } from '../geo/utm.mjs';
 import { parseGLB } from '../../src/engine/loaders/GLTF.js';
-import { FERRY } from '../../src/world/FerrySpec.js';
+import { TITLE, loadMap, isMain } from '../lib/title.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = TITLE;
+const MAP = loadMap(), FERRY = MAP.vessel, PL = MAP.route.planner, FR = MAP.frame;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const R2 = v => Math.round(v * 100) / 100;
 
-const MSL_TO_MLLW = 2.773 - 1.822; // NOAA 9414290: MSL − MLLW (m)
-export const DEPTH_OPEN = FERRY.draft + 1.0 + MSL_TO_MLLW; // 3.45 m below MSL
-export const DEPTH_BERTH = FERRY.draft + 0.5; // 2.0 m, within BERTH_ZONE of a terminal
+const MSL_TO_MLLW = PL.datums.MSL - PL.datums.MLLW; // the title's tide station: MSL − MLLW (m)
+export const DEPTH_OPEN = FERRY.draft + 1.0 + MSL_TO_MLLW; // below MSL
+export const DEPTH_BERTH = FERRY.draft + 0.5; // within BERTH_ZONE of a terminal
 export const BERTH_ZONE = 150;
-const CELL = 6, SIZE = 9600, N = SIZE / CELL, O = -SIZE / 2;
+const CELL = 6, SIZE = FR.size, N = SIZE / CELL, O = -SIZE / 2;
 
 function terrain(dir) {
   const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8'));
@@ -53,9 +54,9 @@ function segDist([ax, az], [bx, bz], x, z) { const dx = bx - ax, dz = bz - az, L
 export function planRoute({ rawDir = RAW, terrainDir = join(root, 'public/terrain'), buildingsDir = join(root, 'public/buildings'), schedule = join(root, 'public/ferry/schedule.json'), draft = FERRY.draft } = {}) {
   const hAt = terrain(terrainDir);
   const sched = JSON.parse(readFileSync(schedule, 'utf8'));
-  // departure gate: the San Francisco SSSF stop with more water within 40 m (Gate C); arrival: Sausalito
+  // departure: of the `from` terminal's stops, the one with the most water within 40 m; arrival: the first `to` stop
   const depth40 = t => { let s = 0; for (let dz = -40; dz <= 40; dz += 10) for (let dx = -40; dx <= 40; dx += 10) s += hAt(t.x + dx, t.z + dz); return s; };
-  const from = [...sched.terminals.sanFrancisco].sort((a, b) => depth40(a) - depth40(b))[0], to = sched.terminals.sausalito[0];
+  const from = [...sched.terminals[PL.fromTerminal]].sort((a, b) => depth40(a) - depth40(b))[0], to = sched.terminals[PL.toTerminal][0];
   const dOpen = draft + 1.0 + MSL_TO_MLLW, dBerth = draft + 0.5;
 
   // obstacles: pier sheds and buildings over the water (shipped building roofs → footprints are the tiles'
@@ -69,8 +70,8 @@ export function planRoute({ rawDir = RAW, terrainDir = join(root, 'public/terrai
     for (let k = 0; k < I.length; k += 3) if (Nn[I[k] * 3 + 1] > 0.5) tris.push([0, 1, 2].map(q => [P[I[k + q] * 3] + n.t[0], P[I[k + q] * 3 + 2] + n.t[2]]));
     rasterPolys(block, tris.filter(t => t.some(([x, z]) => hAt(x, z) < 0.5)), 3);
   }
-  const osm = JSON.parse(readCached('landmarks-osm.json', rawDir).toString('utf8')).elements;
-  const L = (lat, lon) => { const [E, N2] = toUTM(lat, lon); return [E - 549504, 4186800 - N2]; };
+  const osm = JSON.parse(readCached(PL.piersOsm, rawDir).toString('utf8')).elements;
+  const L = (lat, lon) => { const [E, N2] = toUTM(lat, lon); return [E - FR.originE, FR.originN - N2]; };
   for (const e of osm) if (e.type === 'way' && e.tags?.man_made === 'pier' && e.geometry) {
     const pts = e.geometry.map(q => L(q.lat, q.lon));
     const closed = pts.length > 3 && pts[0][0] === pts.at(-1)[0] && pts[0][1] === pts.at(-1)[1];
@@ -146,12 +147,12 @@ export function planRoute({ rawDir = RAW, terrainDir = join(root, 'public/terrai
   }
   return {
     from: { stopId: from.stopId, name: from.name, x: from.x, z: from.z }, to: { stopId: to.stopId, name: to.name, x: to.x, z: to.z },
-    rules: { draft, depthOpen: R2(dOpen), depthBerth: R2(dBerth), berthZone: BERTH_ZONE, cell: CELL, datum: 'MSL (NAVD88 + 0.969 m); open water also holds at MLLW' },
+    rules: { draft, depthOpen: R2(dOpen), depthBerth: R2(dBerth), berthZone: BERTH_ZONE, cell: CELL, datum: PL.datumNote },
     waypoints: way.map(([x, z]) => [R2(x), R2(z)]), length: R2(length), minDepthAlong: R2(minDepth),
   };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const out = arg('--out', join(root, 'public/ferry/route.json'));
   mkdirSync(dirname(out), { recursive: true });
   const r = planRoute({ rawDir: arg('--raw', RAW) });

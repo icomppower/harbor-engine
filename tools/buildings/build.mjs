@@ -1,7 +1,8 @@
-// G2b pipeline: cached building footprints + heights → extruded building tiles (GLB) in the bay frame.
-//   node tools/buildings/build.mjs [--raw <dir>] [--out <dir>]
-// SF (DataSF, PDDL): roof = LiDAR median first-return elevation (median_1st_m, NAVD88) → local MSL.
-// Sausalito (OSM, ODbL): OSM `height`, else `building:levels` × 3 m, else a logged 6 m default.
+// Building pipeline: cached building footprints + heights → extruded building tiles (GLB) in the title frame.
+//   node node_modules/harbor-engine/tools/buildings/build.mjs [--raw <dir>] [--out <dir>]      (from the title)
+// The title's hooks.js `collectBuildings( kit )` reads its own datasets (footprints, heights, fallbacks) and
+// calls kit.finish() once per building; everything from there on (base, class, colours, extrusion, LODs,
+// tiles) is shared. Heights: a roof elevation (above local MSL) or a height above the ground.
 // Base: lowest terrain under the footprint − 1 m, never deeper than 2 m below MSL (pier sheds stand on the
 // water line; the DEM has no piers, D22). Tiles: the 600 m terrain tile grid, by footprint centroid.
 // Vertex data per tile: POSITION (tile-local), NORMAL, TEXCOORD_0 (walls: metres along the wall, metres
@@ -11,7 +12,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import earcut from 'earcut';
 import { readCached, RAW } from '../data/cache.mjs';
 import { readTiff } from '../geo/tiff.mjs';
@@ -19,28 +20,17 @@ import { dehaze } from '../geo/naip.mjs';
 import { toUTM } from '../geo/utm.mjs';
 import { writeGLB } from '../geo/glb.mjs';
 import { mergeHeights, GRID } from '../terrain/build.mjs';
+import { TITLE, loadMap, isMain } from '../lib/title.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const root = TITLE;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const MM = v => Math.round(v * 1000) / 1000;
 export const DEFAULT_HEIGHT = 6, LEVEL_HEIGHT = 3, MAX_SINK = -2;
 export const LOD_DISTANCES = [900, 2500]; // m from the tile: LOD0 nearer than 900 m, LOD1 to 2.5 km, LOD2 beyond
 
-// Wall palettes by building type (sRGB bytes). Towers: glass and stone curtain walls; mid-rise: concrete,
-// sandstone, brick (Jackson Square and the Embarcadero warehouses); houses: San Francisco's painted Victorians;
-// Sausalito: wood shingle and white clapboard; pier sheds: the cream Beaux-Arts bulkheads. D38.
-const WALLS = {
-  tower: [[118, 138, 152], [104, 126, 124], [150, 156, 162], [92, 104, 120], [186, 182, 172], [132, 146, 160], [170, 168, 160]],
-  mid: [[182, 178, 170], [160, 157, 150], [206, 192, 162], [190, 170, 140], [150, 82, 62], [136, 72, 56], [166, 98, 72], [224, 220, 210], [198, 196, 188], [176, 150, 120]],
-  house: [[214, 226, 205], [238, 222, 160], [230, 192, 190], [182, 206, 226], [240, 236, 226], [202, 192, 222], [226, 206, 172], [168, 180, 168], [236, 214, 196], [196, 216, 214]],
-  sausalito: [[142, 112, 82], [122, 96, 72], [236, 232, 224], [202, 212, 208], [230, 220, 182], [168, 140, 106], [214, 206, 192]],
-  pier: [[222, 212, 186], [210, 200, 178], [198, 194, 184]],
-};
-// Roof palettes where no aerial colour is used (tall buildings lean in the imagery, tiny footprints, no pixels)
-const ROOFS = {
-  city: [[92, 92, 92], [118, 116, 110], [138, 136, 128], [104, 100, 96], [156, 152, 144]],
-  sausalito: [[164, 92, 62], [150, 84, 58], [92, 82, 72], [118, 118, 116], [132, 104, 80]],
-};
+// Palettes (sRGB bytes) come from map.json `palettes`: walls by name, plus the typed wall sets `tower`,
+// `mid`, `house` and `pier` used when a source gives no style of its own (D38); roofs where no aerial colour is
+// used (tall buildings lean in the imagery, tiny footprints, no pixels).
 export const NAIP_MAX_HEIGHT = 40; // m: above this, relief displacement moves the roof off its footprint in NAIP
 const pick = (list, id, salt) => list[hash(id + salt) % list.length];
 // ±8 % brightness per building so neighbours with the same swatch still differ
@@ -59,14 +49,14 @@ function heightSampler(merged) {
   };
 }
 
-function cleanRing(pts) {
+export function cleanRing(pts) {
   const out = [];
   for (const p of pts) { const q = out[out.length - 1]; if (!q || q[0] !== p[0] || q[1] !== p[1]) out.push(p); }
   if (out.length > 1 && out[0][0] === out[out.length - 1][0] && out[0][1] === out[out.length - 1][1]) out.pop();
   return out.length >= 3 ? out : null;
 }
-const inside = (r, x, z) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, zi] = r[i], [xj, zj] = r[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
-const area2 = r => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return a; };
+export const inside = (r, x, z) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, zi] = r[i], [xj, zj] = r[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+export const area2 = r => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return a; };
 
 // Roof colour from NAIP: the per-channel median of the pixels inside the footprint (shadow pixels, luma < 40,
 // left out), or null when there are too few usable pixels.
@@ -93,19 +83,17 @@ function naipSampler(tif) {
   };
 }
 
-// Collect every building as { id, polys: [[outer, ...holes]], top, base, cls, tint, src }
-export function collectBuildings({ rawDir = RAW, merged } = {}) {
+// The kit a title's collectBuildings( kit ) works with. kit.finish( id, polys, roofAbove, roofAbs, style ):
+// polys = [[outer, ...holes]] in frame metres (kit.local( lat, lon ) converts); roofAbs = roof elevation above
+// local MSL or null (then ground + roofAbove); style = { walls: palette name or null (typed by class),
+// roofs: palette name, naip: kit.naip( file ) sampler or null }.
+export function buildingKit({ rawDir = RAW, merged, map = loadMap() } = {}) {
   merged = merged || mergeHeights({ rawDir });
   const hAt = heightSampler(merged), msl = merged.msl;
-  const log = { sfLidar: 0, sfFallback: 0, osmHeight: 0, osmLevels: 0, osmDefault: 0, skipped: 0 };
+  const WALLS = map.palettes.walls, ROOFS = map.palettes.roofs;
   const roofLog = { naip: 0, paletteTall: 0, paletteNoPixels: 0 };
-  const naip = { sf: naipSampler(readTiff(readCached('naip-sf.tif', rawDir))), osm: naipSampler(readTiff(readCached('naip-sausalito.tif', rawDir))) };
-  // footprints replaced by a landmark model (data/landmarks.json, D4 / G2c)
-  const anchors = JSON.parse(readFileSync(join(root, 'data/landmarks.json'), 'utf8')).landmarks
-    .filter(l => l.replacesFootprint).map(l => ({ name: l.name, p: local(l.lat, l.lon) }));
-  const excluded = [];
   const out = [];
-  const finish = (id, polys, roofAbove, roofAbs, src) => {
+  const finish = (id, polys, roofAbove, roofAbs, style) => {
     let gMin = Infinity, gMax = -Infinity;
     for (const poly of polys) for (const [x, z] of poly[0]) { const g = hAt(x, z); gMin = Math.min(gMin, g); gMax = Math.max(gMax, g); }
     const base = MM(Math.max(gMin - 1, MAX_SINK));
@@ -115,40 +103,31 @@ export function collectBuildings({ rawDir = RAW, merged } = {}) {
     const h = top - Math.max(gMax, 0);
     const cls = h > 60 ? 255 : h > 15 ? 128 : 0;
     const overWater = base <= MAX_SINK;
-    const walls = src === 'osm' ? WALLS.sausalito : overWater ? WALLS.pier : cls === 255 ? WALLS.tower : cls === 128 ? WALLS.mid : WALLS.house;
+    const walls = style.walls ? WALLS[style.walls] : overWater ? WALLS.pier : cls === 255 ? WALLS.tower : cls === 128 ? WALLS.mid : WALLS.house;
     const wall = jitter(pick(walls, id, 'w'), id);
-    let roof = h <= NAIP_MAX_HEIGHT ? naip[src](polys[0]) : null;
-    if (roof) roofLog.naip++; else { roofLog[h > NAIP_MAX_HEIGHT ? 'paletteTall' : 'paletteNoPixels']++; roof = jitter(pick(src === 'osm' ? ROOFS.sausalito : ROOFS.city, id, 'r'), id); }
-    out.push({ id, polys, top, base, cls, wall, roof, src, h, area: Math.abs(polys.reduce((a, poly) => a + area2(poly[0]), 0)) / 2 });
+    let roof = h <= NAIP_MAX_HEIGHT && style.naip ? style.naip(polys[0]) : null;
+    if (roof) roofLog.naip++; else { roofLog[h > NAIP_MAX_HEIGHT ? 'paletteTall' : 'paletteNoPixels']++; roof = jitter(pick(ROOFS[style.roofs], id, 'r'), id); }
+    out.push({ id, polys, top, base, cls, wall, roof, src: style.src, h, area: Math.abs(polys.reduce((a, poly) => a + area2(poly[0]), 0)) / 2 });
   };
+  // footprints replaced by a landmark model (the title's data/landmarks.json `replacesFootprint`)
+  const landmarkAnchors = () => JSON.parse(readFileSync(join(root, 'data/landmarks.json'), 'utf8')).landmarks
+    .filter(l => l.replacesFootprint).map(l => ({ name: l.name, p: local(l.lat, l.lon) }));
+  return {
+    rawDir, merged, msl, map, out, roofLog, finish, local, cleanRing, inside, area2, landmarkAnchors,
+    DEFAULT_HEIGHT, LEVEL_HEIGHT,
+    readJSON: file => JSON.parse(readCached(file, rawDir).toString('utf8')),
+    naip: file => naipSampler(readTiff(readCached(file, rawDir))),
+  };
+}
 
-  const sf = JSON.parse(readCached('sf-buildings.geojson', rawDir).toString('utf8'));
-  for (const f of sf.features) {
-    const p = f.properties, geom = f.geometry;
-    const polys = (geom.type === 'MultiPolygon' ? geom.coordinates : [geom.coordinates])
-      .map(poly => poly.map(ring => cleanRing(ring.map(([lon, lat]) => local(lat, lon)))).filter(Boolean))
-      .filter(poly => poly.length && Math.abs(area2(poly[0])) > 1);
-    if (!polys.length) { log.skipped++; continue; }
-    const lm = anchors.find(a => polys.some(poly => inside(poly[0], a.p[0], a.p[1])));
-    if (lm) { excluded.push({ landmark: lm.name, id: 'sf' + p.sf16_bldgid }); continue; }
-    const roofAbs = parseFloat(p.median_1st_m), above = parseFloat(p.hgt_median_m);
-    if (Number.isFinite(roofAbs) && Number.isFinite(above) && above > 1) { log.sfLidar++; finish('sf' + p.sf16_bldgid, polys, above, roofAbs - msl, 'sf'); }
-    else { log.sfFallback++; finish('sf' + p.sf16_bldgid, polys, Number.isFinite(above) && above > 0 ? above : DEFAULT_HEIGHT, null, 'sf'); }
-  }
-
-  const osm = JSON.parse(readCached('sausalito-osm.json', rawDir).toString('utf8'));
-  const ways = osm.elements.filter(e => e.type === 'way' && e.tags?.building && e.geometry?.length >= 4).sort((a, b) => a.id - b.id);
-  for (const w of ways) {
-    const ring = cleanRing(w.geometry.map(g => local(g.lat, g.lon)));
-    if (!ring || Math.abs(area2(ring)) < 2) { log.skipped++; continue; }
-    const hTag = parseFloat(String(w.tags.height || '').replace(/[^\d.]/g, '')), lv = parseFloat(w.tags['building:levels']);
-    let above;
-    if (Number.isFinite(hTag) && hTag > 0) { above = hTag; log.osmHeight++; }
-    else if (Number.isFinite(lv) && lv > 0) { above = lv * LEVEL_HEIGHT; log.osmLevels++; }
-    else { above = DEFAULT_HEIGHT; log.osmDefault++; }
-    finish('osm' + w.id, [[ring]], above, null, 'osm');
-  }
-  return { buildings: out, log, excluded, roofLog };
+// Collect every building as { id, polys: [[outer, ...holes]], top, base, cls, wall, roof, src } through the
+// title's hooks.js; returns { buildings, log, excluded, roofLog }.
+export async function collectBuildings({ rawDir = RAW, merged, hooks } = {}) {
+  hooks = hooks || await import(pathToFileURL(join(root, 'hooks.js')).href);
+  if (typeof hooks.collectBuildings !== 'function') throw new Error(`${join(root, 'hooks.js')} must export collectBuildings( kit )`);
+  const kit = buildingKit({ rawDir, merged });
+  const { log, excluded = [] } = await hooks.collectBuildings(kit);
+  return { buildings: kit.out, log, excluded, roofLog: kit.roofLog };
 }
 
 // Walls + roof of one building, appended to a tile's arrays (positions relative to the tile centre).
@@ -243,7 +222,7 @@ export function writeBuildingTiles(lodTiles, log, outDir, excluded = [], roofLog
   for (const f of readdirSync(outDir)) if (/^b_\d+_\d+(_l\d)?\.glb(\.deflate)?$/.test(f) || f === 'index.json') rmSync(join(outDir, f));
   const write = (t, lod) => {
     const name = `b_${t.i}_${t.j}${lod ? '_l' + lod : ''}.glb.deflate`;
-    const glb = deflateSync(writeGLB({ meshes: [{
+    const glb = deflateSync(writeGLB({ generator: loadMap().id, meshes: [{
       name: `buildings_${t.i}_${t.j}_lod${lod}`, translation: [t.cx, 0, t.cz],
       position: new Float32Array(t.G.pos), normal: new Float32Array(t.G.nrm), uv: new Float32Array(t.G.uv),
       color: new Uint8Array(t.G.col), index: new Uint32Array(t.G.idx),
@@ -268,9 +247,9 @@ export function writeBuildingTiles(lodTiles, log, outDir, excluded = [], roofLog
   return index;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isMain(import.meta.url)) {
   const t0 = performance.now();
-  const { buildings, log, excluded, roofLog } = collectBuildings({ rawDir: arg('--raw', RAW) });
+  const { buildings, log, excluded, roofLog } = await collectBuildings({ rawDir: arg('--raw', RAW) });
   const index = writeBuildingTiles([0, 1, 2].map(lod => buildTiles(buildings, lod)), log, arg('--out', join(root, 'public/buildings')), excluded, roofLog);
   console.log(`roofs: ${JSON.stringify(roofLog)}`);
   console.log(`landmark exclusions ${JSON.stringify(excluded)}`);

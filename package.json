@@ -1,20 +1,54 @@
 {
-  "name": "bay-crossing",
+  "name": "harbor-engine",
   "version": "1.0.0",
-  "scripts": {
-    "dev": "vite --host 127.0.0.1 --port 5189",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "node test/engine-smoke.mjs",
-    "verify": "./verify.sh",
-    "fetch-data": "node tools/data/fetch.mjs"
+  "description": "Harbor Engine — built on Tidewater: a WebGPU/WGSL real-data waterfront engine (rendering, water, sky, player/boat, pipelines, gates) for separate title and game repos",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./vite": "./vite.mjs",
+    "./src/*": "./src/*",
+    "./tools/*": "./tools/*",
+    "./gates/*": "./gates/*",
+    "./test/*": "./test/*",
+    "./schema/*": "./schema/*",
+    "./package.json": "./package.json"
   },
-  "devDependencies": {
+  "bin": {
+    "harbor-engine": "bin/harbor-engine.mjs"
+  },
+  "files": [
+    "src",
+    "assets",
+    "tools",
+    "gates",
+    "test/headless.mjs",
+    "schema",
+    "template",
+    "bin",
+    "docs",
+    "vite.mjs",
+    "LICENSE",
+    "CREDITS.md"
+  ],
+  "scripts": {
+    "test": "node test/engine-smoke.mjs",
+    "schema": "node bin/harbor-engine.mjs schema",
+    "verify": "./verify.sh"
+  },
+  "dependencies": {
     "earcut": "^3.2.3",
-    "vite": "^8.3.0",
     "webgpu": "^0.6.1"
   },
-  "license": "MIT",
-  "private": true,
-  "type": "module"
+  "peerDependencies": {
+    "vite": "^8.3.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0",
+    "vite": "^8.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }

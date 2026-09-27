@@ -6,7 +6,11 @@ import { inflateSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const root = join( dirname( fileURLToPath( import.meta.url ) ), '../..' );
+// the title under test (working directory or HARBOR_TITLE) and the engine it runs on
+export const root = process.env.HARBOR_TITLE || process.cwd();
+export const engineRoot = join( dirname( fileURLToPath( import.meta.url ) ), '../..' );
+// a script path relative to the title if the title has it, else to the engine
+export const resolveScript = ( script ) => existsSync( join( root, script ) ) ? join( root, script ) : join( engineRoot, script );
 
 export function hashDir( dir ) {
 
@@ -31,7 +35,7 @@ export function compareDirs( a, b, label ) {
 // run a pipeline script as a child with all network access blocked
 export function runOffline( script, args ) {
 
-	return spawnSync( process.execPath, [ '--import', join( root, 'gates/lib/no-network.mjs' ), join( root, script ), ...args ], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 } );
+	return spawnSync( process.execPath, [ '--import', join( engineRoot, 'gates/lib/no-network.mjs' ), resolveScript( script ), ...args ], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 } );
 
 }
 

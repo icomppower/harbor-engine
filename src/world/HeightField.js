@@ -1,4 +1,4 @@
-import { toLocal } from './BayFrame.js';
+import { toLocal } from './Frame.js';
 
 // A square heightfield over the world domain (centred on the origin), with the accessors the ocean, terrain,
 // shore and player systems read: heights, heightAt / normalAt, coastDistance, and the min/max pyramid for

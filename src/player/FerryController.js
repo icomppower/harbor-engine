@@ -1,5 +1,5 @@
 import * as THREE from '../engine/index.js';
-import { FERRY, KNOT } from '../world/FerrySpec.js';
+import { FERRY, KNOT } from '../world/VesselSpec.js';
 
 const RHO = 1025;
 const GRAV = 9.81;
@@ -10,7 +10,7 @@ const _r = new THREE.Vector3(), _f = new THREE.Vector3(), _vp = new THREE.Vector
 const _a = new THREE.Vector3(), _fwd = new THREE.Vector3(), _side = new THREE.Vector3(), _v = new THREE.Vector3();
 const _invQ = new THREE.Quaternion(), _dq = new THREE.Quaternion();
 
-// Rigid-body model of the MV Golden Gate-class catamaran (FerrySpec.js), with the public surface of
+// Rigid-body model of the title's catamaran (VesselSpec.js), with the public surface of
 // BoatController (position, quaternion, velocity, throttle / steer / rpm, driven / moored, toWorld, getYaw,
 // sampleWaterAt, queueQueries, setInput, update) so the player, spray, wake and audio systems drive it the same
 // way.
@@ -293,4 +293,4 @@ export class FerryController {
 
 }
 
-export const FERRY_TOP_SPEED = FERRY.topSpeedKn * KNOT;
+export const ferryTopSpeed = () => FERRY.topSpeedKn * KNOT; // m/s (read after configureMap)

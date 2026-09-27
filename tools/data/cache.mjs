@@ -2,14 +2,15 @@
 // pipelines only ever see the cached, checksummed download (never the network).
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { TITLE } from '../lib/title.mjs';
 
-export const RAW = join(dirname(fileURLToPath(import.meta.url)), '../../data/raw');
+// the title's download cache
+export const RAW = join(TITLE, 'data/raw');
 
 export function readCached(file, dir = RAW) {
   const man = join(dir, 'MANIFEST.sha256');
-  if (!existsSync(man)) throw new Error(`cache: ${man} missing — run node tools/data/fetch.mjs`);
+  if (!existsSync(man)) throw new Error(`cache: ${man} missing — run the title's fetch pipeline (npm run fetch-data)`);
   const want = readFileSync(man, 'utf8').trim().split('\n').map(l => l.split(/\s+/)).find(([, f]) => f === file)?.[0];
   if (!want) throw new Error(`cache: ${file} is not in MANIFEST.sha256`);
   const path = join(dir, file);

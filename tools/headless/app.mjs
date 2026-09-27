@@ -1,15 +1,22 @@
 // Boots the real App (src/App.js) in headless Dawn: a minimal DOM shim, a fake canvas whose WebGPU context
-// hands out an offscreen texture, and fetch() of relative URLs served from public/. Used by the gates.
+// hands out an offscreen texture, and fetch() of relative URLs served from the title's public/ (then the
+// engine's assets/). The title is the working directory, or HARBOR_TITLE, or `title`; its map.json is loaded
+// and configured first. Used by the gates.
 //   const H = await bootApp( { width: 1920, height: 1080, query: '?noAudio' } );
 //   H.frames( 10 ); const rgba = await H.readPixels(); H.app.settings.timeOfDay = 19;
 import '../../test/headless.mjs';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = join( dirname( fileURLToPath( import.meta.url ) ), '../..' );
+const engineRoot = join( dirname( fileURLToPath( import.meta.url ) ), '../..' );
+export const titleRoot = () => process.env.HARBOR_TITLE || process.cwd();
 
-export async function bootApp( { width = 1280, height = 720, query = '?noAudio' } = {} ) {
+export async function bootApp( { width = 1280, height = 720, query = '?noAudio', title = titleRoot(), map = null } = {} ) {
+
+	const { configureMap } = await import( '../../src/map/configure.js' );
+	// HARBOR_MAP: a replacement map.json (gate fixtures, e.g. E0's palette change)
+	configureMap( map || JSON.parse( readFileSync( process.env.HARBOR_MAP || join( title, 'map.json' ), 'utf8' ) ) );
 
 	const noop = () => {};
 	const element = () => ( {
@@ -56,7 +63,8 @@ export async function bootApp( { width = 1280, height = 720, query = '?noAudio' 
 
 		const u = String( url );
 		if ( /^[a-z]+:/i.test( u ) ) return netFetch( url, opts );
-		const buf = readFileSync( join( root, 'public', u.replace( /^\.?\//, '' ).split( '?' )[ 0 ] ) );
+		const rel = u.replace( /^\.?\//, '' ).split( '?' )[ 0 ], own = join( title, 'public', rel );
+		const buf = readFileSync( existsSync( own ) ? own : join( engineRoot, 'assets', rel ) );
 		return new Response( buf );
 
 	};

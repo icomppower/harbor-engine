@@ -1,8 +1,12 @@
 // On-screen controls for touch devices, feeding the same Input state as the keyboard and mouse:
 // a left-thumb joystick drives W / A / S / D (walk, or throttle and steering at the ferry helm), a drag anywhere
 // else looks around, and buttons press keys (E helm / step ashore, jump, G autopilot, V camera, T time, F free
-// camera, N next waypoint). Shown when the primary pointer is coarse, or with ?touch.
+// camera, N next waypoint). Shown when the primary pointer is coarse, or with ?touch. Gate E3 covers the look.
 const DEAD = 0.3; // joystick dead zone (fraction of its radius)
+
+// controls keep their own fingers: buttons, the stick, sliders and menus, open panels and dialogs, signs
+const CONTROLS = 'button, a, input, select, textarea, label, [role="slider"], [role="listbox"], [role="dialog"], .tc-stick, .tc-btn, .tw-panel, .tw-help, .tw-menu, .tw-start, .tw-sign';
+const isControl = ( el ) => !! ( el && el.closest && el.closest( CONTROLS ) );
 
 export function wantsTouch( qs ) {
 
@@ -68,22 +72,38 @@ export class TouchControls {
 
 		}
 
-		// look: a finger that lands on the view (not on a control or an interface panel)
+		// look: any finger that does not land on a control — on the view, or on the glass of a HUD panel next to it
+		// (a panel's background is not a control, and a finger starting beside one must still turn the camera)
 		const view = app.engine.domElement;
 		view.style.touchAction = 'none';
-		view.addEventListener( 'touchstart', ( e ) => {
+		window.addEventListener( 'touchstart', ( e ) => {
 
-			e.preventDefault();
+			this.forgetLost( e );
 			if ( this.lookId !== null ) return;
-			const t = e.changedTouches[ 0 ];
+			const t = [ ...e.changedTouches ].find( ( q ) => ! isControl( q.target ) && ! this.buttonTouches.has( q.identifier ) && q.identifier !== this.stickId );
+			if ( ! t ) return;
+			if ( e.cancelable ) e.preventDefault();
 			this.lookId = t.identifier;
 			this.last = { x: t.clientX, y: t.clientY };
 
 		}, opts );
-		window.addEventListener( 'touchmove', ( e ) => this.move( e ), opts );
+		window.addEventListener( 'touchmove', ( e ) => { this.forgetLost( e ); this.move( e ); }, opts );
 		const end = ( e ) => this.end( e );
 		window.addEventListener( 'touchend', end );
 		window.addEventListener( 'touchcancel', end );
+
+	}
+
+	// A touchend can be lost (a system gesture, a notification, the finger leaving the page): a tracked finger
+	// that is no longer on the screen is released, or it would hold the look / stick / a button forever.
+	forgetLost( e ) {
+
+		const live = new Set( [ ...e.touches ].map( ( t ) => t.identifier ) );
+		const lost = [];
+		if ( this.lookId !== null && ! live.has( this.lookId ) ) lost.push( this.lookId );
+		if ( this.stickId !== null && ! live.has( this.stickId ) ) lost.push( this.stickId );
+		for ( const id of this.buttonTouches.keys() ) if ( ! live.has( id ) ) lost.push( id );
+		if ( lost.length ) this.end( { changedTouches: lost.map( ( identifier ) => ( { identifier } ) ) } );
 
 	}
 
