@@ -356,6 +356,15 @@
         }
       }
     },
+    "buildings": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "baseAllRings": {
+          "type": "boolean"
+        }
+      }
+    },
     "palettes": {
       "type": "object",
       "required": [

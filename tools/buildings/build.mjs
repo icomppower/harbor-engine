@@ -19,7 +19,7 @@ import { readTiff } from '../geo/tiff.mjs';
 import { dehaze } from '../geo/naip.mjs';
 import { toUTM } from '../geo/utm.mjs';
 import { writeGLB } from '../geo/glb.mjs';
-import { mergeHeights, GRID } from '../terrain/build.mjs';
+import { mergeHeights, shapedHeights, GRID } from '../terrain/build.mjs';
 import { TITLE, loadMap, isMain } from '../lib/title.mjs';
 
 const root = TITLE;
@@ -59,17 +59,18 @@ export const inside = (r, x, z) => { let c = false; for (let i = 0, j = r.length
 export const area2 = r => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return a; };
 
 // Roof colour from NAIP: the per-channel median of the pixels inside the footprint (shadow pixels, luma < 40,
-// left out), or null when there are too few usable pixels.
+// left out), or null when there are too few usable pixels (12 m² of roof, at least 3). Any pixel size (the GeoTIFF's cell).
 function naipSampler(tif) {
-  const [, , , e0, n0] = tif.tags[33922], W = tif.width, H = tif.height, [R, Gc, B] = tif.bands;
-  const fix = dehaze(tif);
+  const [, , , e0, n0] = tif.tags[33922], W = tif.width, H = tif.height, [R, Gc, B] = tif.bands, cell = tif.tags[33550][0];
+  const fix = dehaze(tif), minPx = Math.max(3, Math.ceil(12 / (cell * cell))); // 12 m² of usable roof
+  const px = cell === 1 ? ([x, z]) => [x + GRID.originE - e0, n0 - (GRID.originN - z)] : ([x, z]) => [(x + GRID.originE - e0) / cell, (n0 - (GRID.originN - z)) / cell];
   return (rings) => {
-    const outer = rings[0].map(([x, z]) => [x + GRID.originE - e0, n0 - (GRID.originN - z)]); // pixel coords (col, row)
+    const outer = rings[0].map(px); // pixel coords (col, row)
     let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
     for (const [c, r] of outer) { c0 = Math.min(c0, c); c1 = Math.max(c1, c); r0 = Math.min(r0, r); r1 = Math.max(r1, r); }
     if (c1 < 0 || r1 < 0 || c0 >= W || r0 >= H) return null;
     const rs = [], gs = [], bs = [];
-    const holes = rings.slice(1).map(h => h.map(([x, z]) => [x + GRID.originE - e0, n0 - (GRID.originN - z)]));
+    const holes = rings.slice(1).map(h => h.map(px));
     for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(H - 1, Math.ceil(r1)); r++) for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(W - 1, Math.ceil(c1)); c++) {
       const px = c + 0.5, py = r + 0.5;
       if (!inside(outer, px, py) || holes.some(h => inside(h, px, py))) continue;
@@ -77,7 +78,7 @@ function naipSampler(tif) {
       if (luma < 40) continue;
       rs.push(R[k]); gs.push(Gc[k]); bs.push(B[k]);
     }
-    if (rs.length < 12) return null;
+    if (rs.length < minPx) return null;
     const med = a => { a.sort((p, q) => p - q); return a[a.length >> 1]; };
     return fix([med(rs), med(gs), med(bs)]);
   };
@@ -91,11 +92,14 @@ export function buildingKit({ rawDir = RAW, merged, map = loadMap() } = {}) {
   merged = merged || mergeHeights({ rawDir });
   const hAt = heightSampler(merged), msl = merged.msl;
   const WALLS = map.palettes.walls, ROOFS = map.palettes.roofs;
+  const allRings = !!(map.buildings && map.buildings.baseAllRings);
   const roofLog = { naip: 0, paletteTall: 0, paletteNoPixels: 0 };
   const out = [];
   const finish = (id, polys, roofAbove, roofAbs, style) => {
     let gMin = Infinity, gMax = -Infinity;
-    for (const poly of polys) for (const [x, z] of poly[0]) { const g = hAt(x, z); gMin = Math.min(gMin, g); gMax = Math.max(gMax, g); }
+    // map.json buildings.baseAllRings: the base also clears the inner rings (a courtyard on lower ground must not
+    // leave its walls floating); off by default so v1.0 titles bake unchanged
+    for (const poly of polys) for (const ring of (allRings ? poly : [poly[0]])) for (const [x, z] of ring) { const g = hAt(x, z); gMin = Math.min(gMin, g); if (ring === poly[0]) gMax = Math.max(gMax, g); }
     const base = MM(Math.max(gMin - 1, MAX_SINK));
     let top = roofAbs !== null ? roofAbs : Math.max(gMax, 0) + roofAbove;
     if (!(top > Math.max(gMax, 0) + 2)) top = Math.max(gMax, 0) + Math.max(roofAbove || 0, 3);
@@ -125,7 +129,7 @@ export function buildingKit({ rawDir = RAW, merged, map = loadMap() } = {}) {
 export async function collectBuildings({ rawDir = RAW, merged, hooks } = {}) {
   hooks = hooks || await import(pathToFileURL(join(root, 'hooks.js')).href);
   if (typeof hooks.collectBuildings !== 'function') throw new Error(`${join(root, 'hooks.js')} must export collectBuildings( kit )`);
-  const kit = buildingKit({ rawDir, merged });
+  const kit = buildingKit({ rawDir, merged: merged || await shapedHeights({ rawDir }) });
   const { log, excluded = [] } = await hooks.collectBuildings(kit);
   return { buildings: kit.out, log, excluded, roofLog: kit.roofLog };
 }

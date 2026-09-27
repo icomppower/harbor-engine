@@ -128,6 +128,14 @@ export async function titleHooks() {
   return existsSync(f) ? import(pathToFileURL(f).href) : {};
 }
 
+// merged heights with the title's shapeTerrain hook applied: what public/terrain holds, for every pipeline that
+// stands things on the ground (buildings, landmarks)
+export async function shapedHeights({ rawDir = RAW } = {}) {
+  const merged = mergeHeights({ rawDir }), hooks = await titleHooks();
+  if (hooks.shapeTerrain) await hooks.shapeTerrain(terrainKit(merged, rawDir));
+  return merged;
+}
+
 export function terrainKit(merged, rawDir = RAW) {
   const { res, size, originE, originN } = GRID, texel = size / res, o = -size / 2;
   const local = (lat, lon) => { const [E, N] = toUTM(lat, lon); return [E - originE, originN - N]; };

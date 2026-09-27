@@ -27,6 +27,7 @@ export const MAP_SCHEMA = {
 		water: obj( { preset: { enum: [ 'bay', 'calm-river', 'still-pool', 'ocean' ] }, swellDir: vec2,
 			optics: obj( { absorption: vec3, scattering: vec3 } ) }, [ 'preset', 'swellDir' ] ),
 		sun: obj( { latitude: { type: 'number', minimum: - 90, maximum: 90 }, declination: num } ),
+		buildings: obj( { baseAllRings: { type: 'boolean' } }, [] ),
 		palettes: obj( { walls: { type: 'object', additionalProperties: palette }, roofs: { type: 'object', additionalProperties: palette } } ),
 		layout: obj( {
 			anchorUTM: vec2,

@@ -9,7 +9,7 @@ import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'nod
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RAW } from '../data/cache.mjs';
-import { mergeHeights, GRID } from '../terrain/build.mjs';
+import { mergeHeights, shapedHeights, GRID } from '../terrain/build.mjs';
 import { TITLE, loadMap, isMain } from '../lib/title.mjs';
 import { parseGLB } from '../../src/engine/loaders/GLTF.js';
 
@@ -20,7 +20,7 @@ export const LOD_DISTANCES = [1500, 5000]; // m: LOD0 nearer than 1.5 km, LOD1 t
 export async function prepareLandmarks({ rawDir = RAW } = {}) {
   const hooks = await import(pathToFileURL(join(root, 'hooks.js')).href);
   if (typeof hooks.prepareLandmarks !== 'function') throw new Error(`${join(root, 'hooks.js')} must export prepareLandmarks( ctx )`);
-  return hooks.prepareLandmarks({ rawDir, grid: GRID, mergeHeights });
+  return hooks.prepareLandmarks({ rawDir, grid: GRID, mergeHeights, shapedHeights });
 }
 
 if (isMain(import.meta.url)) {
