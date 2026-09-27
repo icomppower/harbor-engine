@@ -18,7 +18,7 @@ import { pathToFileURL } from 'node:url';
 const root = TITLE;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 
-// World grid: square domain centred on the frame origin (map.json `frame`), 3 m cells.
+// World grid: square domain centred on the frame origin (map.json `frame`), `frame.cell` m cells (default 3).
 export const GRID = gridOf();
 const T = loadMap().terrain, F = loadMap().frame;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };

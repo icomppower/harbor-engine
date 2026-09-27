@@ -62,6 +62,10 @@
         "size": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "cell": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },

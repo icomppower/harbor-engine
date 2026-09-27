@@ -13,6 +13,9 @@
 
 ## Current
 
+**v1.1.0 (2026-09-27):** additive `frame.cell` + `loadLodModel` / `Material` / `sceneMaterial` exports for the SFO
+Approach title (E1 + smoke green; D-entry in DECISIONS.md).
+
 **Milestone A done (2026-09-26):** E0–E4 green in one clean `./verify.sh` run; tagged `v1.0.0`; bay-crossing
 switched to `github:icomppower/harbor-engine#v1.0.0` and E0 re-run green on the installed release (title G0–G7
 green); live site rebuilt from the release and boots (39 building tiles, 5 landmarks, 0 page errors);

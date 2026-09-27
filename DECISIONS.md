@@ -30,3 +30,9 @@ SPEC §3 decisions (D1–D7) are in `SPEC.md` / Notion. New ones, one line each:
   from `map.frame.utmZone`, paged custom fetch sources, TIFF magic check, title negatives in the clean gate, then
   water bodies / presets / lights), so Milestone B keeps `v1.1.0` as the SPEC names it. Each release re-runs E0
   on bay-crossing first (D3).
+
+## D1 — v1.1.0: optional `frame.cell` and movable LOD models (2026-09-27)
+Additive, for the SFO Approach title (a 24 km square around KSFO on 6 m cells; an aircraft model driven by a game
+every frame). `frame.cell` defaults to 3, so every v1.0 title bakes byte-identical. `loadLodModel` generalises
+the landmark LOD loader (distance × lens) for GLBs a title bakes itself; `Material` / `sceneMaterial` let a
+game own meshes (runway markings, lights) without importing engine internals. No breaking change (D4).

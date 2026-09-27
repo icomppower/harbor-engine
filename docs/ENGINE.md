@@ -38,7 +38,7 @@ e.g. `map.json is invalid: missing required field "frame.originE"`.
 | Field | Meaning |
 |-------|---------|
 | `id`, `name` | repo id (`[a-z0-9-]`), display name |
-| `frame` | `crs`, `utmZone`, `hemisphere`, `originE`, `originN` (UTM metres, centre of the world square), `size` (m). World frame: x east, z south, y up, sea level (local MSL) y = 0; terrain grid 3 m cells, 200-cell tiles |
+| `frame` | `crs`, `utmZone`, `hemisphere`, `originE`, `originN` (UTM metres, centre of the world square), `size` (m), optional `cell` (terrain grid cell in m, default 3; v1.1). World frame: x east, z south, y up, sea level (local MSL) y = 0; terrain grid `cell` m cells, 200-cell tiles |
 | `bbox`, `slice` | WGS84 box; UTM extent of the slice |
 | `sources[]` | `id`, `file`, `licence`, `url` for every dataset (CREDITS.md repeats them) |
 | `terrain` | cached file names: `land` DEM, `sea` DEM, `datum` (tide-station datums JSON, MSL vs NAVD88), `datumStation`, `aerial` (NAIP GeoTIFF for the ground colour map) |
@@ -92,6 +92,12 @@ Never run Blender while a dev server is up.
   `goToWaypoint( i )`, `setFreeCam( on )`.
 - Exports for gates and tools: `validateMap`, `validateGame`, `MAP_SCHEMA`, `GAME_SCHEMA`, `CAPABILITIES`,
   `FRAME`, `toLocal`, `toUTM`, `WORLD`, `VESSEL`, `WAYPOINTS`, `PLACES`, `ENGINE_VERSION`.
+- v1.1 (additive): `loadLodModel( files, { lodDistances, refFov, name } )` → a Group of LOD levels from a title's own
+  GLBs (Blender exports; PBR colour / roughness / metalness per material) that a game places and orients every
+  frame and whose `update( camera )` picks the level by distance and lens; `glbGroup( arrayBuffer )`,
+  `glbMaterial( gltfMaterial )`; `Material` (the engine material: WGSL `surface` / `vertex` snippets, uniforms) and
+  `sceneMaterial( params )` (three.js-style parameters) for game-owned meshes such as markings and lights. A game
+  that drives the camera itself sets it after `app.update` has run the player (its `update` is called after them).
 
 ## 6. `game.json`
 

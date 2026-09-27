@@ -9,4 +9,9 @@ export { WORLD } from './world/WorldLayout.js';
 export { FERRY as VESSEL, KNOT } from './world/VesselSpec.js';
 export { WAYPOINTS, waypointPose } from './world/Waypoints.js';
 export { PLACES } from './world/Places.js';
-export const ENGINE_VERSION = '1.0.0';
+// v1.1: movable LOD models (a title's own GLBs), the engine Material and the scene material helpers for
+// game-owned meshes (docs/ENGINE.md §5)
+export { loadLodModel, glbGroup, glbMaterial } from './world/Models.js';
+export { Material } from './engine/render/Material.js';
+export { standard as sceneMaterial } from './materials/Materials.js';
+export const ENGINE_VERSION = '1.1.0';

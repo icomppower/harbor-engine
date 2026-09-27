@@ -15,7 +15,7 @@ export const MAP_SCHEMA = {
 	...obj( {
 		id: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]*$' },
 		name: str,
-		frame: obj( { crs: str, utmZone: { type: 'integer', minimum: 1, maximum: 60 }, hemisphere: { enum: [ 'N', 'S' ] }, originE: num, originN: num, size: { type: 'number', exclusiveMinimum: 0 } } ),
+		frame: obj( { crs: str, utmZone: { type: 'integer', minimum: 1, maximum: 60 }, hemisphere: { enum: [ 'N', 'S' ] }, originE: num, originN: num, size: { type: 'number', exclusiveMinimum: 0 }, cell: { type: 'number', exclusiveMinimum: 0 } }, [ 'crs', 'utmZone', 'hemisphere', 'originE', 'originN', 'size' ] ),
 		bbox: obj( { south: num, west: num, north: num, east: num } ),
 		slice: obj( { extent: obj( { minE: num, minN: num, maxE: num, maxN: num } ), note: str }, [ 'extent' ] ),
 		sources: { type: 'array', minItems: 1, items: obj( { id: str, file: str, licence: str, url: str }, [ 'id', 'licence' ] ) },

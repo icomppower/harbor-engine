@@ -13,10 +13,11 @@ export function loadMap(root = TITLE) {
   cached = { root, map };
   return map;
 }
-// the terrain grid of the title's world frame: square domain centred on the frame origin, 3 m cells, 200-cell tiles
+// the terrain grid of the title's world frame: square domain centred on the frame origin, `frame.cell` metre
+// cells (default 3 m; a title covering a wider area may choose a coarser grid, v1.1), 200-cell tiles
 export function gridOf(map = loadMap()) {
-  const { originE, originN, size } = map.frame;
-  return { originE, originN, size, res: Math.round(size / 3), tile: 200 };
+  const { originE, originN, size, cell = 3 } = map.frame;
+  return { originE, originN, size, cell, res: Math.round(size / cell), tile: 200 };
 }
 // true when this module is the script node was started with (compares real paths: titles reach the engine
 // through a node_modules symlink)
