@@ -11,6 +11,9 @@ import { readTiff } from '../geo/tiff.mjs';
 import { readCached, RAW } from '../data/cache.mjs';
 import { dehaze } from '../geo/naip.mjs';
 import { TITLE, loadMap, gridOf, isMain } from '../lib/title.mjs';
+import { toUTM } from '../geo/utm.mjs';
+import { existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 const root = TITLE;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
@@ -76,10 +79,10 @@ export function aerialMap({ rawDir = RAW, merged } = {}) {
   return { width: W, height: H, cell, rgb };
 }
 
-export function writeTiles(merged, outDir, aerial = null) {
+export function writeTiles(merged, outDir, aerial = null, water = null) {
   const { res, tile, size } = GRID, n = res / tile;
   mkdirSync(outDir, { recursive: true });
-  for (const f of readdirSync(outDir)) if (/^t_\d+_\d+\.bin$/.test(f) || f === 'index.json' || f === 'aerial.bin') rmSync(join(outDir, f));
+  for (const f of readdirSync(outDir)) if (/^t_\d+_\d+\.bin$/.test(f) || f === 'index.json' || f === 'aerial.bin' || f === 'water.bin') rmSync(join(outDir, f));
   const files = [];
   for (let tj = 0; tj < n; tj++) for (let ti = 0; ti < n; ti++) {
     const t = new Int16Array(tile * tile);
@@ -106,13 +109,74 @@ export function writeTiles(merged, outDir, aerial = null) {
       format: `RGB8 sRGB (${AERIAL_BITS} significant bits), row 0 = north, same square as the heightfield, zlib deflate; 0,0,0 = water`, source: `${T.aerial} (haze corrected)`,
       sha256: createHash('sha256').update(bin).digest('hex') };
   }
+  if (water) {
+    const bin = deflateSync(water.mask, { level: 9, memLevel: 9, strategy: 0 });
+    writeFileSync(join(outDir, 'water.bin'), bin);
+    index.water = { file: 'water.bin', format: 'u8 per terrain cell, row 0 = north, zlib deflate: 0 dry, 1 open water (below local MSL), 2+ the bodies below',
+      open: water.open, bodies: water.bodies, sha256: createHash('sha256').update(bin).digest('hex') };
+  }
   writeFileSync(join(outDir, 'index.json'), JSON.stringify(index, null, 1) + '\n');
   return index;
+}
+
+// ---- water bodies and authored terrain (title hooks, optional)
+// hooks.js `shapeTerrain( kit )` may edit merged heights (authored basins, logged by the title);
+// `waterBodies( kit )` → [ { id, name, preset, level (m above local MSL), rings: [ [ [ lat, lon ], … ] ] } ].
+// Without either hook the output is exactly the plain terrain (no water.bin).
+export async function titleHooks() {
+  const f = join(TITLE, 'hooks.js');
+  return existsSync(f) ? import(pathToFileURL(f).href) : {};
+}
+
+export function terrainKit(merged, rawDir = RAW) {
+  const { res, size, originE, originN } = GRID, texel = size / res, o = -size / 2;
+  const local = (lat, lon) => { const [E, N] = toUTM(lat, lon); return [E - originE, originN - N]; };
+  const inside = (r, x, z) => { let c = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, zi] = r[i], [xj, zj] = r[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  // cells whose centre lies inside the polygon (outer ring minus holes; rings in [lat, lon])
+  const cellsIn = (rings) => {
+    const R = rings.map(r => r.map(([la, lo]) => local(la, lo)));
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of R[0]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const out = [];
+    for (let j = Math.max(0, Math.floor((z0 - o) / texel)); j <= Math.min(res - 1, Math.floor((z1 - o) / texel)); j++)
+      for (let i = Math.max(0, Math.floor((x0 - o) / texel)); i <= Math.min(res - 1, Math.floor((x1 - o) / texel)); i++) {
+        const x = o + (i + 0.5) * texel, z = o + (j + 0.5) * texel;
+        if (inside(R[0], x, z) && !R.slice(1).some(h => inside(h, x, z))) out.push(j * res + i);
+      }
+    return out;
+  };
+  // distance (m) from each listed cell to the nearest cell outside the set (edge = 1 cell)
+  const edgeDistance = (cells) => {
+    const set = new Set(cells), d = new Map();
+    let front = cells.filter(k => [-1, 1, -res, res].some(n => !set.has(k + n)));
+    for (const k of front) d.set(k, texel);
+    while (front.length) {
+      const next = [];
+      for (const k of front) for (const n of [-1, 1, -res, res]) { const q = k + n; if (set.has(q) && !d.has(q)) { d.set(q, d.get(k) + texel); next.push(q); } }
+      front = next;
+    }
+    return d;
+  };
+  return { merged, rawDir, grid: GRID, texel, local, cellsIn, edgeDistance, height: k => merged.heights[k] / 100, setHeight: (k, h) => { merged.heights[k] = Math.max(-32768, Math.min(32767, Math.round(h * 100))); } };
+}
+
+export function waterMask(kit, bodies, preset) {
+  const { res } = GRID, H = kit.merged.heights, mask = new Uint8Array(res * res);
+  for (let k = 0; k < mask.length; k++) if (H[k] < 0) mask[k] = 1;
+  const out = bodies.map((b, n) => {
+    const code = 2 + n, cells = b.rings.flatMap(p => kit.cellsIn(p));
+    for (const k of cells) mask[k] = code;
+    return { code, id: b.id, name: b.name, preset: b.preset, level: Math.round(b.level * 1000) / 1000, cells: cells.length, area: Math.round(cells.length * kit.texel * kit.texel) };
+  });
+  return { mask, open: { code: 1, preset, cells: [...mask].filter(v => v === 1).length }, bodies: out };
 }
 
 if (isMain(import.meta.url)) {
   const t0 = performance.now();
   const merged = mergeHeights({ rawDir: arg('--raw', RAW) });
-  const index = writeTiles(merged, arg('--out', join(root, 'public/terrain')), aerialMap({ rawDir: arg('--raw', RAW), merged }));
+  const hooks = await titleHooks(), kit = terrainKit(merged, arg('--raw', RAW));
+  if (hooks.shapeTerrain) console.log('shapeTerrain: ' + JSON.stringify(await hooks.shapeTerrain(kit)));
+  const water = hooks.waterBodies ? waterMask(kit, await hooks.waterBodies(kit), loadMap().water.preset) : null;
+  const index = writeTiles(merged, arg('--out', join(root, 'public/terrain')), aerialMap({ rawDir: arg('--raw', RAW), merged }), water);
   console.log(`terrain: ${index.files.length} tiles, MSL = NAVD88 + ${merged.msl.toFixed(3)} m, ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 }
